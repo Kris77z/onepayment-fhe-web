@@ -23,7 +23,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-type PageType = 'overview' | 'trade' | 'history' | 'settings' | 'test';
+type PageType = 'overview' | 'trade' | 'history' | 'settings';
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onPageChange?: (page: PageType) => void;
@@ -66,13 +66,6 @@ export function AppSidebar({ onPageChange, currentPage, ...props }: AppSidebarPr
       icon: IconSettings,
       key: "settings" as PageType,
       isActive: pathname?.startsWith("/dashboard/settings"),
-    },
-    {
-      title: "Test",
-      url: "/dashboard/test",
-      icon: IconExchange,
-      key: "test" as PageType,
-      isActive: pathname?.startsWith("/dashboard/test"),
     },
   ];
 

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/sidebar"
 import Link from "next/link"
 
-type PageType = 'overview' | 'trade' | 'history' | 'settings' | 'test';
+type PageType = 'overview' | 'trade' | 'history' | 'settings';
 
 export function NavMain({
   items,

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { IconChevronLeft, IconChevronRight, IconExternalLink } from "@tabler/icons-react"
+import { IconChevronLeft, IconChevronRight, IconExternalLink, IconDownload } from "@tabler/icons-react"
 
 type PaymentRow = {
   id: string
@@ -53,6 +53,7 @@ export default function PaymentsTable(){
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [resp, setResp] = React.useState<ListResp>({ items: [], total: 0, page: 1, pageSize })
+  const [exporting, setExporting] = React.useState(false)
 
   const fetchList = React.useCallback(async ()=>{
     try{
@@ -73,6 +74,49 @@ export default function PaymentsTable(){
   }, [page, pageSize, status, search])
 
   React.useEffect(() => { fetchList() }, [fetchList])
+  const toCsv = (rows: PaymentRow[]) => {
+    const header = ['time','chain','token','amount','sender','status','txHash']
+    const lines = [header.join(',')]
+    for(const it of rows){
+      const token = it.order?.tokenSymbol || (it.status==='fee' ? 'FEE' : '')
+      const sender = it.sender ? `${it.sender}` : ''
+      const cols = [
+        new Date(it.createdAt).toISOString(),
+        it.chain,
+        token,
+        it.amount,
+        sender,
+        it.status,
+        it.txHash || ''
+      ]
+      lines.push(cols.map(v => String(v).replace(/"/g,'""')).map(v=>`"${v}"`).join(','))
+    }
+    return lines.join('\n')
+  }
+
+  async function handleExport(){
+    try{
+      setExporting(true)
+      // 简化：导出当前筛选条件下的前 1000 条
+      const qs = new URLSearchParams()
+      qs.set('page', '1')
+      qs.set('pageSize', '1000')
+      if(status && status !== 'all') qs.set('status', status)
+      if(search.trim()) qs.set('search', search.trim())
+      qs.set('range', '30d')
+      qs.set('includeFees', 'true')
+      const data = await getJson<ListResp>(`/api/merchants/${encodeURIComponent(MERCHANT_ID)}/payments?${qs.toString()}`)
+      const csv = toCsv(data?.items||[])
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `payments_${new Date().toISOString().slice(0,10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    }catch(e){ setError(e instanceof Error ? e.message : String(e)) }
+    finally{ setExporting(false) }
+  }
 
   const totalPages = Math.max(1, Math.ceil((resp?.total||0) / (resp?.pageSize||pageSize)))
 
@@ -109,6 +153,9 @@ export default function PaymentsTable(){
             </SelectContent>
           </Select>
           <Button variant="outline" onClick={()=>{ setPage(1); fetchList() }}>Refresh</Button>
+          <Button onClick={handleExport} disabled={exporting}>
+            <IconDownload className="h-4 w-4 mr-2" />{exporting ? 'Exporting...' : 'Export CSV'}
+          </Button>
         </div>
 
         <div className="rounded-md border overflow-x-auto">

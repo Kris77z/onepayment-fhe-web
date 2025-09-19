@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Image from "next/image";
 import { 
   IconShield, 
   IconBell, 
@@ -17,9 +19,15 @@ import {
   IconEyeOff,
   IconPlus,
   IconTrash,
-  IconRefresh
+  IconRefresh,
+  IconMail,
+  IconBrowserCheck,
+  IconExchange,
+  IconAlertTriangle,
+  IconBulb,
+  IconLock
 } from "@tabler/icons-react";
-import { postJson } from "@/lib/api";
+import { postJson, getJson } from "@/lib/api";
 
 export function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false);
@@ -32,53 +40,31 @@ export function SettingsPage() {
     news: false,
   });
 
-  // 模拟 API 密钥数据
-  const [apiKeys, setApiKeys] = useState([
-    {
-      id: '1',
-      name: 'Production API',
-      key: 'pk_live_1234567890abcdef...',
-      created: '2024-01-10',
-      lastUsed: '2024-01-15',
-      permissions: ['read', 'write'],
-      status: 'active'
-    },
-    {
-      id: '2',
-      name: 'Development API',
-      key: 'pk_test_abcdef1234567890...',
-      created: '2024-01-05',
-      lastUsed: '2024-01-14',
-      permissions: ['read'],
-      status: 'active'
-    }
-  ]);
 
-  const handleNotificationChange = (key: string, value: boolean) => {
-    setNotifications(prev => ({ ...prev, [key]: value }));
+  // Merchant basics (server-managed)
+  const [merchantLoading, setMerchantLoading] = useState(false)
+  const [merchant, setMerchant] = useState<null | { id: string; name: string; api_key_masked: string; webhook_url: string; fee_bps: number; status: string; preferences?: any }>(null)
+  const [overrideApiKey, setOverrideApiKey] = useState<string>('')
+  const [newApiKey, setNewApiKey] = useState<string>('')
+  const [webhookUrl, setWebhookUrl] = useState<string>('')
+  const [failedWebhooks, setFailedWebhooks] = useState<Array<{ id: string; targetUrl: string; status: string; lastError?: string; updatedAt: string }>>([])
+  const [failedLoading, setFailedLoading] = useState(false)
+  const [totpSetup, setTotpSetup] = useState<{ otpauth?: string; qrcode_data_url?: string; secret_base32?: string }|null>(null)
+  const [totpCode, setTotpCode] = useState('')
+  const [totpLoading, setTotpLoading] = useState(false)
+  const [totpError, setTotpError] = useState('')
+
+  const handleNotificationChange = async (key: string, value: boolean) => {
+    const next = { ...notifications, [key]: value }
+    setNotifications(next)
+    try{ await postJson(`/api/merchant/preferences`, { [key]: value }, { headers: apiHeaders() }) }catch{}
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    // 可以添加toast提示
+    // TODO: Add toast notification
   };
 
-  const generateNewApiKey = () => {
-    const newKey = {
-      id: Date.now().toString(),
-      name: 'New API Key',
-      key: 'pk_live_' + Math.random().toString(36).substr(2, 20) + '...',
-      created: new Date().toISOString().split('T')[0],
-      lastUsed: '-',
-      permissions: ['read'],
-      status: 'active'
-    };
-    setApiKeys(prev => [...prev, newKey]);
-  };
-
-  const deleteApiKey = (id: string) => {
-    setApiKeys(prev => prev.filter(key => key.id !== id));
-  };
 
   // API Quickstart envs (dev convenience)
   const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '')
@@ -99,42 +85,40 @@ export function SettingsPage() {
   // Payment URL Generator state
   const [genChain, setGenChain] = useState('bsc-testnet')
   const [genToken, setGenToken] = useState<'USDT'|'USDC'>('USDT')
-  const [genTokenAddress, setGenTokenAddress] = useState('0x337610d27c682E347C9cD60BD4b3b107C9d34dDd')
-  const [genDecimals, setGenDecimals] = useState(18)
   const [genAmount, setGenAmount] = useState('20.00')
   const [genFixed, setGenFixed] = useState(true)
   const [genResult, setGenResult] = useState<{pay_url?:string;deep_link?:string;qrcode_text?:string;error?:string}|null>(null)
   const [genLoading, setGenLoading] = useState(false)
+  const [orderExpiryMin, setOrderExpiryMin] = useState<number>(15)
 
-  function applyPreset(nextChain: string, nextToken: 'USDT'|'USDC'){
-    // Provide safe presets for demo networks only; otherwise leave manual
-    if(nextChain === 'bsc-testnet' && nextToken === 'USDT'){
-      setGenTokenAddress('0x337610d27c682E347C9cD60BD4b3b107C9d34dDd')
-      setGenDecimals(18)
-    } else {
-      // Unknown preset: keep current or ask user to fill
-      setGenTokenAddress('')
-      setGenDecimals(6)
-    }
+  // Chain configs with logos
+  const chainConfigs = {
+    'bsc': { name: 'BSC', logo: '/images/bsc-chain.png' },
+    'arbitrum': { name: 'Arbitrum', logo: '/images/arb-chain.png' },
+    'ethereum': { name: 'Ethereum', logo: '/images/eth-chian.png' },
+    'solana': { name: 'Solana', logo: '/images/sol-chain.png' }
   }
+  
+  // Token configs with logos
+  const tokenConfigs = {
+    'USDT': { name: 'USDT', logo: '/images/usdt.png' },
+    'USDC': { name: 'USDC', logo: '/images/usdc.png' }
+  }
+
 
   async function handleGenerate(){
     try{
       setGenLoading(true)
       setGenResult(null)
-      if(!genTokenAddress){
-        setGenResult({ error: 'Please provide token address for selected chain/token.' })
-        return
-      }
       const body = {
         id: `DEMO_${Date.now()}`,
         chain: genChain,
         token_symbol: genToken,
-        token_address: genTokenAddress,
-        decimals: genDecimals,
         expected_amount: genAmount,
+        // Default expiry time (minutes)
+        deadline: Math.floor(Date.now()/1000 + Math.max(1, orderExpiryMin)*60)
       }
-      const resp = await postJson<{pay_url?: string; deep_link?: string; qrcode_text?: string}>(`/api/orders`, body)
+      const resp = await postJson<{pay_url?: string; deep_link?: string; qrcode_text?: string}>(`/api/orders`, body, { headers: apiHeaders() })
       setGenResult({ pay_url: resp?.pay_url, deep_link: resp?.deep_link, qrcode_text: resp?.qrcode_text })
     }catch(e: unknown){
       const errorMessage = (e as Error)?.message || 'Generate failed'
@@ -142,6 +126,100 @@ export function SettingsPage() {
     }finally{
       setGenLoading(false)
     }
+  }
+
+  // Helpers
+  function apiHeaders(): Record<string, string> {
+    return overrideApiKey ? { 'X-API-Key': overrideApiKey } : {}
+  }
+
+  async function loadMerchant(){
+    try{
+      setMerchantLoading(true)
+      const data = await getJson<{ id:string; name:string; api_key_masked:string; webhook_url:string; fee_bps:number; status:string; preferences?: any }>(`/api/merchant/self`, { headers: apiHeaders() })
+      setMerchant(data)
+      setWebhookUrl(data?.webhook_url || '')
+      if(data?.preferences){ setNotifications((prev)=>({ ...prev, ...data.preferences })) }
+    }catch{
+      // ignore
+    }finally{
+      setMerchantLoading(false)
+    }
+  }
+
+  async function loadFailedWebhooks(){
+    try{
+      setFailedLoading(true)
+      const res = await getJson<{ items: Array<{ id:string; targetUrl:string; status:string; lastError?:string; updatedAt:string }> }>(`/api/webhooks/failed`, { headers: apiHeaders() })
+      setFailedWebhooks(res?.items || [])
+    }catch{
+      setFailedWebhooks([])
+    }finally{
+      setFailedLoading(false)
+    }
+  }
+
+  useEffect(()=>{
+    // load override from session storage if present
+    try{ const s = sessionStorage.getItem('onepay_override_api_key'); if(s) setOverrideApiKey(s) }catch{}
+    loadMerchant(); loadFailedWebhooks();
+  },[])
+
+  async function rotateApiKey(){
+    try{
+      const res = await postJson<{ api_key:string }>(`/api/merchant/api-keys/rotate`, {}, { headers: apiHeaders() })
+      if(res?.api_key){
+        setNewApiKey(res.api_key)
+        setOverrideApiKey(res.api_key)
+        await loadMerchant()
+      }
+    }catch{}
+  }
+
+  async function saveWebhook(){
+    try{
+      await postJson(`/api/merchant/webhook`, { webhook_url: webhookUrl }, { headers: apiHeaders() })
+      await loadMerchant()
+    }catch{}
+  }
+
+  async function testWebhook(){
+    try{
+      await postJson(`/api/merchant/webhook/test`, {}, { headers: apiHeaders() })
+      await loadFailedWebhooks()
+    }catch{}
+  }
+
+  // 2FA handlers
+  async function setup2FA(){
+    setTotpError(''); setTotpLoading(true)
+    try{
+      const res = await postJson<{ otpauth:string; qrcode_data_url:string; secret_base32?: string }>(`/api/merchant/2fa/setup`, {}, { headers: apiHeaders() })
+      setTotpSetup(res)
+    }catch(e: unknown){
+      const m = (e as any)?.data?.error || (e as Error)?.message || 'Setup failed'
+      setTotpError(String(m))
+    }finally{ setTotpLoading(false) }
+  }
+  async function verify2FA(){
+    setTotpError(''); setTotpLoading(true)
+    try{
+      await postJson(`/api/merchant/2fa/verify`, { code: totpCode }, { headers: apiHeaders() })
+      setTotpSetup(null); setTotpCode(''); await loadMerchant()
+    }catch(e: unknown){
+      const m = (e as any)?.data?.error || (e as Error)?.message || 'Verify failed'
+      setTotpError(String(m))
+    }finally{ setTotpLoading(false) }
+  }
+  async function disable2FA(){
+    setTotpError(''); setTotpLoading(true)
+    try{ await postJson(`/api/merchant/2fa/disable`, {}, { headers: apiHeaders() }); await loadMerchant() }catch(e: unknown){ const m=(e as any)?.data?.error||(e as Error)?.message||'Disable failed'; setTotpError(String(m)) } finally{ setTotpLoading(false) }
+  }
+  async function retryWebhook(id: string){
+    try{
+      await postJson(`/api/webhooks/${encodeURIComponent(id)}/retry`, {}, { headers: apiHeaders() })
+      await loadFailedWebhooks()
+    }catch{}
   }
 
   return (
@@ -170,9 +248,12 @@ export function SettingsPage() {
                 <h3 className="text-lg font-medium">Preferences</h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Email</p>
-                      <p className="text-sm text-muted-foreground">Receive important updates via email</p>
+                    <div className="flex items-center gap-3">
+                      <IconMail className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Email</p>
+                        <p className="text-sm text-muted-foreground">Receive important updates via email</p>
+                      </div>
                     </div>
                     <Switch 
                       checked={notifications.email}
@@ -180,9 +261,12 @@ export function SettingsPage() {
                     />
                   </div>
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Browser push</p>
-                      <p className="text-sm text-muted-foreground">Receive push notifications in your browser</p>
+                    <div className="flex items-center gap-3">
+                      <IconBrowserCheck className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Browser push</p>
+                        <p className="text-sm text-muted-foreground">Receive push notifications in your browser</p>
+                      </div>
                     </div>
                     <Switch 
                       checked={notifications.push}
@@ -197,9 +281,12 @@ export function SettingsPage() {
                 <h3 className="text-lg font-medium">Notification types</h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Transaction updates</p>
-                      <p className="text-sm text-muted-foreground">Completed, failed, and status updates</p>
+                    <div className="flex items-center gap-3">
+                      <IconExchange className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Transaction updates</p>
+                        <p className="text-sm text-muted-foreground">Completed, failed, and status updates</p>
+                      </div>
                     </div>
                     <Switch 
                       checked={notifications.trading}
@@ -207,9 +294,12 @@ export function SettingsPage() {
                     />
                   </div>
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Security alerts</p>
-                      <p className="text-sm text-muted-foreground">Login activity and security notices</p>
+                    <div className="flex items-center gap-3">
+                      <IconAlertTriangle className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Security alerts</p>
+                        <p className="text-sm text-muted-foreground">Login activity and security notices</p>
+                      </div>
                     </div>
                     <Switch 
                       checked={notifications.security}
@@ -217,9 +307,12 @@ export function SettingsPage() {
                     />
                   </div>
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Product updates</p>
-                      <p className="text-sm text-muted-foreground">New features and announcements</p>
+                    <div className="flex items-center gap-3">
+                      <IconBulb className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Product updates</p>
+                        <p className="text-sm text-muted-foreground">New features and announcements</p>
+                      </div>
                     </div>
                     <Switch 
                       checked={notifications.news}
@@ -232,12 +325,46 @@ export function SettingsPage() {
               {/* Security */}
               <div className="space-y-4 pt-6 border-t">
                 <h3 className="text-lg font-medium">Two-factor authentication</h3>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Authenticator app</p>
-                    <p className="text-sm text-muted-foreground">Use Google Authenticator or other apps</p>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <IconLock className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Authenticator app</p>
+                        <p className="text-sm text-muted-foreground">Use Google Authenticator or other apps</p>
+                      </div>
+                    </div>
+                    <Switch 
+                      checked={Boolean(merchant?.preferences?.totp_enabled)}
+                      onCheckedChange={(checked) => {
+                        if (checked && !merchant?.preferences?.totp_enabled) {
+                          setup2FA()
+                        } else if (!checked && merchant?.preferences?.totp_enabled) {
+                          disable2FA()
+                        }
+                      }}
+                      disabled={totpLoading}
+                    />
                   </div>
-                  <Switch />
+                  {!merchant?.preferences?.totp_enabled && totpSetup && (
+                    <div className="space-y-3 pl-0">
+                      {totpSetup.qrcode_data_url && (
+                        <img src={totpSetup.qrcode_data_url} alt="TOTP QR" className="w-40 h-40" />
+                      )}
+                      {totpSetup.secret_base32 && (
+                        <div className="text-xs">
+                          <div className="text-muted-foreground mb-1">Or enter this key manually:</div>
+                          <pre className="rounded border p-2 font-mono text-xs select-all inline-block">{totpSetup.secret_base32}</pre>
+                        </div>
+                      )}
+                      <div className="text-xs text-muted-foreground">Scan the QR with Google Authenticator / 1Password, then enter the 6-digit code.</div>
+                      <div className="flex gap-2">
+                        <Input value={totpCode} onChange={(e)=>setTotpCode(e.target.value)} placeholder="123456" className="w-40" />
+                        <Button size="sm" onClick={verify2FA} disabled={totpLoading}>{totpLoading ? 'Verifying...' : 'Verify'}</Button>
+                      </div>
+                      {totpError && <div className="text-xs text-red-500">{totpError}</div>}
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -246,6 +373,71 @@ export function SettingsPage() {
 
         {/* API Settings */}
         <TabsContent value="api" className="space-y-6 mt-4">
+          {/* Merchant & API Key */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Merchant & API Key</CardTitle>
+              <CardDescription>Manage your merchant configuration and API keys (please update environment variables after rotation).</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">Merchant</div>
+                  <div className="text-sm font-medium">{merchantLoading ? 'Loading...' : (merchant?.name || 'N/A')}</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">Status</div>
+                  <div className="text-sm font-medium">{merchant?.status || '-'}</div>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <div className="text-sm font-medium">API Key (Read-only Masked)</div>
+                  <div className="flex gap-2">
+                    <Input value={merchant?.api_key_masked || maskedKey} readOnly className="font-mono" />
+                    <Button variant="outline" size="sm" onClick={rotateApiKey}>
+                      <IconRefresh className="h-4 w-4 mr-2" />Rotate
+                    </Button>
+                  </div>
+                </div>
+                {newApiKey && (
+                  <div className="space-y-2 md:col-span-2">
+                    <div className="text-sm font-medium">New API Key (One-time display, save immediately)</div>
+                    <div className="flex gap-2">
+                      <Input value={newApiKey} readOnly className="font-mono" />
+                      <Button variant="outline" size="sm" onClick={()=>copyToClipboard(newApiKey)}>
+                        <IconCopy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" onClick={()=>{ try{ sessionStorage.setItem('onepay_override_api_key', newApiKey); setOverrideApiKey(newApiKey) }catch{} }}>Use for this session</Button>
+                      <div className="text-xs text-muted-foreground">Requests from this page will carry X-API-Key.</div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">Note: This page will use the new key for subsequent requests, but you still need to update it in your server/frontend environment variables.</div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Webhook Configuration */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Webhook</CardTitle>
+              <CardDescription>Configure callback URL and send test events (with HMAC signature).</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2 md:col-span-2">
+                  <div className="text-sm font-medium">Callback URL</div>
+                  <div className="flex gap-2">
+                    <Input value={webhookUrl} onChange={(e)=>setWebhookUrl(e.target.value)} placeholder="https://your.domain/webhook" />
+                    <Button variant="outline" size="sm" onClick={saveWebhook}>Save</Button>
+                    <Button size="sm" onClick={testWebhook}>Send Test</Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardContent className="space-y-6 pt-6">
               <div className="grid md:grid-cols-2 gap-4">
@@ -280,42 +472,60 @@ export function SettingsPage() {
               {/* Payment URL Generator */}
               <div className="space-y-3 pt-6 border-t">
                 <h3 className="text-lg font-medium">Payment URL Generator</h3>
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div className="space-y-3">
                     <div className="text-sm font-medium">Chain</div>
-                    <select className="w-full border rounded-md h-9 px-2" value={genChain} onChange={(e)=>{ const v=e.target.value; setGenChain(v); applyPreset(v, genToken) }}>
-                      <option value="bsc-testnet">bsc-testnet</option>
-                      <option value="bsc">bsc</option>
-                      <option value="arbitrum">arbitrum</option>
-                      <option value="ethereum">ethereum</option>
-                      <option value="solana">solana</option>
-                    </select>
+                    <Select value={genChain} onValueChange={setGenChain}>
+                      <SelectTrigger>
+                        <SelectValue>
+                          <div className="flex items-center gap-2">
+                            <Image src={chainConfigs[genChain as keyof typeof chainConfigs]?.logo || '/images/bsc-chain.png'} alt={genChain} width={16} height={16} className="rounded-full" />
+                            <span>{chainConfigs[genChain as keyof typeof chainConfigs]?.name || genChain}</span>
+                          </div>
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(chainConfigs).map(([key, config]) => (
+                          <SelectItem key={key} value={key}>
+                            <div className="flex items-center gap-2">
+                              <Image src={config.logo} alt={key} width={16} height={16} className="rounded-full" />
+                              <span>{config.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-3">
                     <div className="text-sm font-medium">Token</div>
-                    <select className="w-full border rounded-md h-9 px-2" value={genToken} onChange={(e)=>{ const v=e.target.value as 'USDT'|'USDC'; setGenToken(v); applyPreset(genChain, v) }}>
-                      <option value="USDT">USDT</option>
-                      <option value="USDC">USDC</option>
-                    </select>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="text-sm font-medium">Token Address</div>
-                    <Input value={genTokenAddress} placeholder="0x... or mint" onChange={(e)=>setGenTokenAddress(e.target.value)} className="font-mono" />
-                  </div>
-                  <div className="space-y-3">
-                    <div className="text-sm font-medium">Decimals</div>
-                    <Input type="number" value={genDecimals} onChange={(e)=>setGenDecimals(Number(e.target.value||0))} />
+                    <Select value={genToken} onValueChange={(v) => setGenToken(v as 'USDT'|'USDC')}>
+                      <SelectTrigger>
+                        <SelectValue>
+                          <div className="flex items-center gap-2">
+                            <Image src={tokenConfigs[genToken]?.logo || '/images/usdt.png'} alt={genToken} width={16} height={16} className="rounded-full" />
+                            <span>{tokenConfigs[genToken]?.name || genToken}</span>
+                          </div>
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(tokenConfigs).map(([key, config]) => (
+                          <SelectItem key={key} value={key}>
+                            <div className="flex items-center gap-2">
+                              <Image src={config.logo} alt={key} width={16} height={16} className="rounded-full" />
+                              <span>{config.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-3">
                     <div className="text-sm font-medium">Amount</div>
-                    <Input value={genAmount} onChange={(e)=>setGenAmount(e.target.value)} />
+                    <Input value={genAmount} onChange={(e)=>setGenAmount(e.target.value)} placeholder="20.00" />
                   </div>
                   <div className="space-y-3">
-                    <div className="text-sm font-medium">Fixed amount</div>
-                    <div className="flex items-center gap-2 h-9">
-                      <Switch checked={genFixed} onCheckedChange={setGenFixed} />
-                      <span className="text-xs text-muted-foreground">Amount is required for payment URLs</span>
-                    </div>
+                    <div className="text-sm font-medium">Order expiry (min)</div>
+                    <Input type="number" value={orderExpiryMin} onChange={(e)=> setOrderExpiryMin(Math.max(1, Number(e.target.value||15)))} />
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -341,11 +551,6 @@ export function SettingsPage() {
                 )}
               </div>
 
-              <div className="text-xs text-muted-foreground">
-                <p><span className="font-medium">Recommended:</span> Use <code>pay_url</code> returned by <code>POST /api/orders</code> as your button href or QR text. It auto-resolves to the correct wallet payment link.</p>
-              </div>
-
-              {/* simplified, removed webhook/docs sections */}
             </CardContent>
           </Card>
         </TabsContent>

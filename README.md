@@ -21,6 +21,11 @@ npm run dev
 # open http://localhost:3000
 ```
 
+### 本地开发页面
+- `/dev`：开发者测试页（仅在 `NODE_ENV=development` 可访问）。
+  - 复用 `dashboard/components/test-page.tsx`，动态导入且禁用 SSR。
+  - 线上环境会直接返回 404。
+
 ## Build
 ```bash
 npm run build
@@ -31,6 +36,11 @@ npm start
 ```
 src/
   app/
+    (dev-only)/
+      dev/
+        page.tsx              # 本地开发专用页（/dev）
+    dashboard/
+      test/                   # 已屏蔽旧路由（/dashboard/test → 404）
     layout.tsx
     page.tsx          # Assemble sections
     globals.css       # Tailwind v4 theme vars

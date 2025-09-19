@@ -7,7 +7,7 @@ import PaymentsTable from "./payments-table";
 export function OverviewPage() {
   return (
     <div className="flex flex-col gap-4">
-      {/* 概览卡片 - 收入、支出、用户、增长 */}
+      {/* Overview cards - income, expenses, users, growth */}
       <SectionCards />
       
       {/* 交互式图表 */}

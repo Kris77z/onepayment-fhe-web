@@ -10,11 +10,11 @@ export const dynamic = "force-static";
 
 function getTitleFromPath(pathname: string): string {
   if (!pathname) return "Overview";
-  if (pathname.startsWith("/dashboard/trade")) return "交易";
-  if (pathname.startsWith("/dashboard/history")) return "历史记录";
-  if (pathname.startsWith("/dashboard/settings")) return "设置";
-  if (pathname.startsWith("/dashboard/test")) return "测试";
-  return "概览";
+  if (pathname.startsWith("/dashboard/trade")) return "Trade";
+  if (pathname.startsWith("/dashboard/history")) return "History";
+  if (pathname.startsWith("/dashboard/settings")) return "Settings";
+  if (pathname.startsWith("/dashboard/test")) return "Test";
+  return "Overview";
 }
 
 export default function DashboardLayout({

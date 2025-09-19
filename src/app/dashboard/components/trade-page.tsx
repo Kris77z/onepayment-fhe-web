@@ -4,45 +4,54 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { IconArrowRight, IconExchange, IconWallet, IconSend } from "@tabler/icons-react";
+import { IconExchange, IconWallet, IconSend } from "@tabler/icons-react";
+import Image from "next/image";
+import { getJson } from "@/lib/api";
+import { useEffect } from "react";
 
 export function TradePage() {
   const [sendAmount, setSendAmount] = useState('');
-  const [receiveAmount, setReceiveAmount] = useState('');
-  const [sendToken, setSendToken] = useState('USDC');
-  const [receiveToken, setReceiveToken] = useState('ETH');
+  const [sendToken, setSendToken] = useState<'USDT'|'USDC'>('USDC');
 
-  // 模拟代币数据
-  const tokens = [
-    { symbol: 'USDC', name: 'USD Coin', balance: '1,234.56', price: '$1.00' },
-    { symbol: 'ETH', name: 'Ethereum', balance: '2.15', price: '$3,245.67' },
-    { symbol: 'BTC', name: 'Bitcoin', balance: '0.125', price: '$67,890.12' },
-    { symbol: 'USDT', name: 'Tether USD', balance: '890.45', price: '$1.00' },
-  ];
-
-  const handleSwapTokens = () => {
-    const temp = sendToken;
-    setSendToken(receiveToken);
-    setReceiveToken(temp);
+  // Token configs with logos (USDT / USDC only)
+  const tokenConfigs: Record<'USDT'|'USDC', { name: string; logo: string }> = {
+    USDT: { name: 'USDT', logo: '/images/usdt.png' },
+    USDC: { name: 'USDC', logo: '/images/usdc.png' },
   };
+
+  // Chain configs with logos
+  const chainConfigs: Record<string, { name: string; logo: string }> = {
+    'ethereum': { name: 'Ethereum', logo: '/images/eth-chian.png' },
+    'bsc': { name: 'BSC', logo: '/images/bsc-chain.png' },
+    'arbitrum': { name: 'Arbitrum', logo: '/images/arb-chain.png' },
+    'solana': { name: 'Solana', logo: '/images/sol-chain.png' },
+  }
+
+  const [chain, setChain] = useState('ethereum')
+
+  // Optional: fetch allowed chain-token map for validation (real business)
+  const [chainTokenMap, setChainTokenMap] = useState<Record<string, Record<'USDT'|'USDC', { address: string; decimals: number }>>>({} as any)
+  useEffect(()=>{ (async()=>{
+    try{ const data = await getJson<Record<string, Record<'USDT'|'USDC',{ address:string; decimals:number }>>>(`/api/config/tokens`); setChainTokenMap(data||{}) }catch{} })() },[])
+
+  // Swap feature pending
 
   return (
     <div className="flex justify-center">
       <div className="space-y-6 max-w-4xl w-full">
 
-      <Tabs defaultValue="swap" className="w-full space-y-4">
+      <Tabs defaultValue="send" className="w-full space-y-4">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="swap">
-            <IconExchange className="mr-2 h-4 w-4" />
-            Swap Tokens
-          </TabsTrigger>
           <TabsTrigger value="send">
             <IconSend className="mr-2 h-4 w-4" />
-            Send Tokens
+            Send
+          </TabsTrigger>
+          <TabsTrigger value="swap">
+            <IconExchange className="mr-2 h-4 w-4" />
+            Swap
           </TabsTrigger>
         </TabsList>
 
@@ -66,24 +75,48 @@ export function TradePage() {
           <Card>
             <CardContent className="space-y-6 pt-6">
               {/* Select Token */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Select Token</Label>
-                <Select>
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Select Token</div>
+                <Select value={sendToken} onValueChange={(v)=>setSendToken(v as 'USDT'|'USDC')}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select token to send" />
+                    <SelectValue>
+                      <div className="flex items-center gap-2">
+                        <Image src={tokenConfigs[sendToken].logo} alt={sendToken} width={16} height={16} className="rounded-full" />
+                        <span>{tokenConfigs[sendToken].name}</span>
+                      </div>
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {tokens.map((token) => (
-                      <SelectItem key={token.symbol} value={token.symbol}>
-                        <div className="flex items-center justify-between w-full">
-                          <div>
-                            <div className="font-medium">{token.symbol}</div>
-                            <div className="text-sm text-muted-foreground">{token.name}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm">{token.balance}</div>
-                            <div className="text-xs text-muted-foreground">{token.price}</div>
-                          </div>
+                    {Object.entries(tokenConfigs).map(([key, cfg]) => (
+                      <SelectItem key={key} value={key}>
+                        <div className="flex items-center gap-2">
+                          <Image src={cfg.logo} alt={key} width={16} height={16} className="rounded-full" />
+                          <span>{cfg.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Select Chain */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Select Chain</div>
+                <Select value={chain} onValueChange={(v)=>setChain(v)}>
+                  <SelectTrigger>
+                    <SelectValue>
+                      <div className="flex items-center gap-2">
+                        <Image src={chainConfigs[chain]?.logo || '/images/eth-chian.png'} alt={chain} width={16} height={16} className="rounded-full" />
+                        <span>{chainConfigs[chain]?.name || chain}</span>
+                      </div>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(chainConfigs).map(([key, cfg]) => (
+                      <SelectItem key={key} value={key}>
+                        <div className="flex items-center gap-2">
+                          <Image src={cfg.logo} alt={key} width={16} height={16} className="rounded-full" />
+                          <span>{cfg.name}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -92,8 +125,8 @@ export function TradePage() {
               </div>
 
               {/* Recipient Address */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Recipient Address</Label>
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Recipient Address</div>
                 <Input placeholder="0x..." />
                 <div className="text-sm text-muted-foreground">
                   Please double-check the address, transfers cannot be reversed
@@ -101,8 +134,8 @@ export function TradePage() {
               </div>
 
               {/* Send Amount */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Send Amount</Label>
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Send Amount</div>
                 <div className="flex gap-2">
                   <Input placeholder="0.00" className="flex-1" />
                   <Button variant="outline">Max</Button>
@@ -113,8 +146,8 @@ export function TradePage() {
               </div>
 
               {/* Network Fee */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Network Fee</Label>
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Network Fee</div>
                 <div className="flex gap-2">
                   <Badge variant="outline">Slow (~5min) - $1.23</Badge>
                   <Badge variant="default">Standard (~2min) - $2.45</Badge>
@@ -139,8 +172,7 @@ export function TradePage() {
               </div>
 
               <Button className="w-full" size="lg">
-                <IconWallet className="mr-2 h-4 w-4" />
-                Confirm Send
+                Confirm
               </Button>
             </CardContent>
           </Card>
