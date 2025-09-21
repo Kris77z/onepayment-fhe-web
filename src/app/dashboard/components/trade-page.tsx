@@ -12,6 +12,8 @@ import Image from "next/image";
 import { getJson } from "@/lib/api";
 import { useEffect } from "react";
 
+type ChainTokenMap = Record<string, Record<'USDT'|'USDC', { address: string; decimals: number }>>
+
 export function TradePage() {
   const [sendAmount, setSendAmount] = useState('');
   const [sendToken, setSendToken] = useState<'USDT'|'USDC'>('USDC');
@@ -33,9 +35,9 @@ export function TradePage() {
   const [chain, setChain] = useState('ethereum')
 
   // Optional: fetch allowed chain-token map for validation (real business)
-  const [chainTokenMap, setChainTokenMap] = useState<Record<string, Record<'USDT'|'USDC', { address: string; decimals: number }>>>({} as any)
+  const [chainTokenMap, setChainTokenMap] = useState<ChainTokenMap>({} as ChainTokenMap)
   useEffect(()=>{ (async()=>{
-    try{ const data = await getJson<Record<string, Record<'USDT'|'USDC',{ address:string; decimals:number }>>>(`/api/config/tokens`); setChainTokenMap(data||{}) }catch{} })() },[])
+    try{ const data = await getJson<ChainTokenMap>(`/api/config/tokens`); setChainTokenMap(data||{} as ChainTokenMap) }catch{} })() },[])
 
   // Swap feature pending
 
