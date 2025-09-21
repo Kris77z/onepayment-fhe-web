@@ -29,6 +29,32 @@ import {
 } from "@tabler/icons-react";
 import { postJson, getJson } from "@/lib/api";
 
+// Types
+type MerchantPreferences = {
+  email?: boolean
+  push?: boolean
+  trading?: boolean
+  security?: boolean
+  news?: boolean
+  totp_enabled?: boolean
+  timezone?: string
+  currency?: string
+}
+
+type MerchantInfo = {
+  id: string
+  name: string
+  api_key_masked: string
+  webhook_url: string
+  fee_bps: number
+  status: string
+  preferences?: MerchantPreferences
+}
+
+type FailedWebhookItem = { id: string; targetUrl: string; status: string; lastError?: string; updatedAt: string }
+
+type ApiError = Error & { status?: number; data?: { error?: string } }
+
 export function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [notifications, setNotifications] = useState({
@@ -43,11 +69,11 @@ export function SettingsPage() {
 
   // Merchant basics (server-managed)
   const [merchantLoading, setMerchantLoading] = useState(false)
-  const [merchant, setMerchant] = useState<null | { id: string; name: string; api_key_masked: string; webhook_url: string; fee_bps: number; status: string; preferences?: any }>(null)
+  const [merchant, setMerchant] = useState<null | MerchantInfo>(null)
   const [overrideApiKey, setOverrideApiKey] = useState<string>('')
   const [newApiKey, setNewApiKey] = useState<string>('')
   const [webhookUrl, setWebhookUrl] = useState<string>('')
-  const [failedWebhooks, setFailedWebhooks] = useState<Array<{ id: string; targetUrl: string; status: string; lastError?: string; updatedAt: string }>>([])
+  const [failedWebhooks, setFailedWebhooks] = useState<Array<FailedWebhookItem>>([])
   const [failedLoading, setFailedLoading] = useState(false)
   const [totpSetup, setTotpSetup] = useState<{ otpauth?: string; qrcode_data_url?: string; secret_base32?: string }|null>(null)
   const [totpCode, setTotpCode] = useState('')
@@ -121,7 +147,8 @@ export function SettingsPage() {
       const resp = await postJson<{pay_url?: string; deep_link?: string; qrcode_text?: string}>(`/api/orders`, body, { headers: apiHeaders() })
       setGenResult({ pay_url: resp?.pay_url, deep_link: resp?.deep_link, qrcode_text: resp?.qrcode_text })
     }catch(e: unknown){
-      const errorMessage = (e as Error)?.message || 'Generate failed'
+      const err = e as ApiError
+      const errorMessage = err?.data?.error || (e as Error)?.message || 'Generate failed'
       setGenResult({ error: errorMessage })
     }finally{
       setGenLoading(false)
@@ -136,7 +163,7 @@ export function SettingsPage() {
   async function loadMerchant(){
     try{
       setMerchantLoading(true)
-      const data = await getJson<{ id:string; name:string; api_key_masked:string; webhook_url:string; fee_bps:number; status:string; preferences?: any }>(`/api/merchant/self`, { headers: apiHeaders() })
+      const data = await getJson<MerchantInfo>(`/api/merchant/self`, { headers: apiHeaders() })
       setMerchant(data)
       setWebhookUrl(data?.webhook_url || '')
       if(data?.preferences){ setNotifications((prev)=>({ ...prev, ...data.preferences })) }
@@ -150,7 +177,7 @@ export function SettingsPage() {
   async function loadFailedWebhooks(){
     try{
       setFailedLoading(true)
-      const res = await getJson<{ items: Array<{ id:string; targetUrl:string; status:string; lastError?:string; updatedAt:string }> }>(`/api/webhooks/failed`, { headers: apiHeaders() })
+      const res = await getJson<{ items: Array<FailedWebhookItem> }>(`/api/webhooks/failed`, { headers: apiHeaders() })
       setFailedWebhooks(res?.items || [])
     }catch{
       setFailedWebhooks([])
@@ -197,7 +224,8 @@ export function SettingsPage() {
       const res = await postJson<{ otpauth:string; qrcode_data_url:string; secret_base32?: string }>(`/api/merchant/2fa/setup`, {}, { headers: apiHeaders() })
       setTotpSetup(res)
     }catch(e: unknown){
-      const m = (e as any)?.data?.error || (e as Error)?.message || 'Setup failed'
+      const err = e as ApiError
+      const m = err?.data?.error || (e as Error)?.message || 'Setup failed'
       setTotpError(String(m))
     }finally{ setTotpLoading(false) }
   }
@@ -207,13 +235,16 @@ export function SettingsPage() {
       await postJson(`/api/merchant/2fa/verify`, { code: totpCode }, { headers: apiHeaders() })
       setTotpSetup(null); setTotpCode(''); await loadMerchant()
     }catch(e: unknown){
-      const m = (e as any)?.data?.error || (e as Error)?.message || 'Verify failed'
+      const err = (e as ApiError)
+      const m = err?.data?.error || (e as Error)?.message || 'Verify failed'
       setTotpError(String(m))
     }finally{ setTotpLoading(false) }
   }
   async function disable2FA(){
     setTotpError(''); setTotpLoading(true)
-    try{ await postJson(`/api/merchant/2fa/disable`, {}, { headers: apiHeaders() }); await loadMerchant() }catch(e: unknown){ const m=(e as any)?.data?.error||(e as Error)?.message||'Disable failed'; setTotpError(String(m)) } finally{ setTotpLoading(false) }
+    try{ await postJson(`/api/merchant/2fa/disable`, {}, { headers: apiHeaders() }); await loadMerchant() }
+    catch(e: unknown){ const err=(e as ApiError); const m= err?.data?.error||(e as Error)?.message||'Disable failed'; setTotpError(String(m)) } 
+    finally{ setTotpLoading(false) }
   }
   async function retryWebhook(id: string){
     try{
