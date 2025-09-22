@@ -1,10 +1,21 @@
 export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '')
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY || ''
+const ENV_API_KEY = process.env.NEXT_PUBLIC_API_KEY || ''
+
+function getEffectiveApiKey(): string {
+  if (typeof window !== 'undefined') {
+    try {
+      const s = sessionStorage.getItem('onepay_override_api_key')
+      if (s && s.trim()) return s.trim()
+    } catch {}
+  }
+  return ENV_API_KEY
+}
 
 // Debug: log env once in browser (masked key)
 (function debugLogEnv(){
   if (typeof window !== 'undefined' && !(window as any).__onepay_api_logged) {
-    const masked = API_KEY ? `${API_KEY.slice(0,4)}…${API_KEY.slice(-4)}` : '<empty>'
+    const k = getEffectiveApiKey()
+    const masked = k ? `${k.slice(0,4)}…${k.slice(-4)}` : '<empty>'
     console.info('[OnePay][api] BASE=%s KEY=%s', API_BASE || '<empty>', masked)
     ;(window as any).__onepay_api_logged = true
   }
@@ -14,9 +25,23 @@ type Json = Record<string, unknown>
 
 function maskKey(k?: string){ return k ? `${k.slice(0,4)}…${k.slice(-4)}` : '<empty>' }
 
+function buildUrl(path: string, key: string): string {
+  const base = `${API_BASE}${path}`
+  try{
+    const u = new URL(base)
+    if (key && !u.searchParams.has('api_key')) u.searchParams.set('api_key', key)
+    return u.toString()
+  }catch{
+    // relative or invalid URL, fallback简单拼接
+    const sep = base.includes('?') ? '&' : '?'
+    return key ? `${base}${sep}api_key=${encodeURIComponent(key)}` : base
+  }
+}
+
 export async function postJson<T = unknown>(path: string, body: Json, init?: RequestInit): Promise<T> {
-  const url = `${API_BASE}${path}`
-  const baseHeaders: Record<string,string> = { 'Content-Type': 'application/json', ...(API_KEY ? { 'X-API-Key': API_KEY } : {}) }
+  const effKey = getEffectiveApiKey()
+  const url = buildUrl(path, effKey)
+  const baseHeaders: Record<string,string> = { 'Content-Type': 'application/json', ...(effKey ? { 'X-API-Key': effKey } : {}) }
   const headers = { ...baseHeaders, ...(init?.headers as Record<string,string> | undefined) }
   // Debug fetch
   if (typeof window !== 'undefined') {
@@ -40,8 +65,9 @@ export async function postJson<T = unknown>(path: string, body: Json, init?: Req
 }
 
 export async function getJson<T = unknown>(path: string, init?: RequestInit): Promise<T> {
-  const url = `${API_BASE}${path}`
-  const baseHeaders: Record<string,string> = { ...(API_KEY ? { 'X-API-Key': API_KEY } : {}) }
+  const effKey = getEffectiveApiKey()
+  const url = buildUrl(path, effKey)
+  const baseHeaders: Record<string,string> = { ...(effKey ? { 'X-API-Key': effKey } : {}) }
   const headers = { ...baseHeaders, ...(init?.headers as Record<string,string> | undefined) }
   if (typeof window !== 'undefined') {
     const usingKey = headers['X-API-Key']
