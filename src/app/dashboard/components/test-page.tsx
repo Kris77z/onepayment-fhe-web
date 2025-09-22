@@ -76,7 +76,7 @@ const SOLANA_MINTS: Record<'USDT'|'USDC', string> = {
   USDC: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
 }
 
-// 支持的链配置（Ethereum / BSC / Arbitrum / BSC Testnet / Solana）
+// 支持的链配置（Ethereum / BSC / Arbitrum / Solana）
 const CHAIN_CONFIGS = {
   'ethereum': {
     chainId: '0x1',
@@ -105,15 +105,6 @@ const CHAIN_CONFIGS = {
     logo: '/images/bsc-chain.png',
     displayName: 'BSC'
   },
-  'bsc-testnet': {
-    chainId: '0x61',
-    chainName: 'Binance Smart Chain Testnet',
-    nativeCurrency: { name: 'tBNB', symbol: 'tBNB', decimals: 18 },
-    rpcUrls: ['https://data-seed-prebsc-1-s1.binance.org:8545'],
-    blockExplorerUrls: ['https://testnet.bscscan.com'],
-    logo: '/images/bsc-chain.png',
-    displayName: 'BSC Testnet'
-  },
   'solana': {
     chainId: 'solana',
     chainName: 'Solana',
@@ -125,10 +116,8 @@ const CHAIN_CONFIGS = {
   }
 }
 
-const BSC_TESTNET_PARAMS = CHAIN_CONFIGS['bsc-testnet']
-
 // 各链常见 USDT/USDC 合约（未确认则留空，需填写自定义合约）
-const TOKENS_BY_CHAIN: Record<'ethereum'|'bsc'|'arbitrum'|'bsc-testnet'|'solana', Record<'USDT'|'USDC', string>> = {
+const TOKENS_BY_CHAIN: Record<'ethereum'|'bsc'|'arbitrum'|'solana', Record<'USDT'|'USDC', string>> = {
   'ethereum': {
     USDT: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
     USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606EB48',
@@ -141,10 +130,6 @@ const TOKENS_BY_CHAIN: Record<'ethereum'|'bsc'|'arbitrum'|'bsc-testnet'|'solana'
     USDT: '0x55d398326f99059fF775485246999027B3197955',
     USDC: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
   },
-  'bsc-testnet': {
-    USDT: '0x337610d27c682E347C9cD60BD4b3b107C9d34dDd',
-    USDC: '', // 未统一，建议用自定义合约
-  },
   'solana': {
     USDT: SOLANA_MINTS.USDT,
     USDC: SOLANA_MINTS.USDC,
@@ -152,15 +137,15 @@ const TOKENS_BY_CHAIN: Record<'ethereum'|'bsc'|'arbitrum'|'bsc-testnet'|'solana'
 }
 
 // 工具：根据 chainId(number) 反查 chain key
-const findChainKeyById = (chainIdNum: number): 'ethereum'|'bsc'|'arbitrum'|'bsc-testnet' | null => {
-  for (const [key, cfg] of Object.entries(CHAIN_CONFIGS) as Array<['ethereum'|'bsc'|'arbitrum'|'bsc-testnet', { chainId: string }]>) {
+const findChainKeyById = (chainIdNum: number): 'ethereum'|'bsc'|'arbitrum' | null => {
+  for (const [key, cfg] of Object.entries(CHAIN_CONFIGS) as Array<['ethereum'|'bsc'|'arbitrum', { chainId: string }]>) {
     if (parseInt(cfg.chainId, 16) === Number(chainIdNum)) return key
   }
   return null
 }
 
 const getTokenAddressForChain = (
-  chainKey: 'ethereum'|'bsc'|'arbitrum'|'bsc-testnet'|'solana',
+  chainKey: 'ethereum'|'bsc'|'arbitrum'|'solana',
   token: 'USDT' | 'USDC',
   custom?: string
 ) => {
@@ -190,7 +175,7 @@ export default function TestPage() {
   const [amount, setAmount] = React.useState<string>('1')
   const [selectedToken, setSelectedToken] = React.useState<'USDT' | 'USDC'>('USDT')
   const [customContract, setCustomContract] = React.useState<string>('')
-  const [selectedChain, setSelectedChain] = React.useState<'ethereum'|'bsc'|'arbitrum'|'bsc-testnet'|'solana'>('bsc-testnet')
+  const [selectedChain, setSelectedChain] = React.useState<'ethereum'|'bsc'|'arbitrum'|'solana'>('bsc')
   const [orderId, setOrderId] = React.useState<string>(() => `ORDER_${Date.now()}`)
   const [lastTx, setLastTx] = React.useState<string>('')
   const [lastStatus, setLastStatus] = React.useState<string>('')
@@ -292,7 +277,6 @@ export default function TestPage() {
       { name: 'ethereum', isEvm: true },
       { name: 'bsc', isEvm: true },
       { name: 'arbitrum', isEvm: true },
-      { name: 'bsc-testnet', isEvm: true },
       { name: 'solana', isEvm: false }
     ]
     
@@ -303,7 +287,7 @@ export default function TestPage() {
     }
   }
 
-  const getTokenAddress = async (overrideChain?: 'ethereum'|'bsc'|'arbitrum'|'bsc-testnet'|'solana') => {
+  const getTokenAddress = async (overrideChain?: 'ethereum'|'bsc'|'arbitrum'|'solana') => {
     // 对于 Solana，始终返回 mint，避免被 EVM 注入的 chainId 干扰
     const chainKey = overrideChain || selectedChain
     if (chainKey === 'solana') {
@@ -463,7 +447,7 @@ export default function TestPage() {
     }
   }
 
-  const checkTokenBalance = async (walletAddress?: string, chainOverride?: 'ethereum'|'bsc'|'arbitrum'|'bsc-testnet'|'solana') => {
+  const checkTokenBalance = async (walletAddress?: string, chainOverride?: 'ethereum'|'bsc'|'arbitrum'|'solana') => {
     try {
       const effectiveChain = chainOverride || selectedChain
       let address = walletAddress || account
@@ -771,7 +755,7 @@ export default function TestPage() {
       const currentChainId = (await injected.request<string>({ method: 'eth_chainId' }))?.toLowerCase()
       if (currentChainId === chainConfig.chainId.toLowerCase()) {
         setCustomContract('') // 切链后清空自定义合约，避免误用
-        setSelectedChain(chainKey as 'ethereum'|'bsc'|'arbitrum'|'bsc-testnet')
+        setSelectedChain(chainKey as 'ethereum'|'bsc'|'arbitrum')
         updateMetrics({ networkSwitched: true })
         toast.success(`已切换到 ${chainConfig.displayName}`)
         addLog(`✅ 成功切换到 ${chainConfig.displayName} (chainId=${currentChainId})`, 'success')
@@ -779,7 +763,7 @@ export default function TestPage() {
         try {
           const accounts = await injected.request<string[]>({ method: 'eth_requestAccounts' })
           const evmAddr = accounts?.[0]
-          if(evmAddr){ setAccount(evmAddr); await checkTokenBalance(evmAddr, chainKey as 'ethereum'|'bsc'|'arbitrum'|'bsc-testnet') }
+          if(evmAddr){ setAccount(evmAddr); await checkTokenBalance(evmAddr, chainKey as 'ethereum'|'bsc'|'arbitrum') }
         } catch {}
       } else {
         addLog(`切换后校验失败: 当前 chainId=${currentChainId}, 期望=${chainConfig.chainId}`, 'error')
@@ -797,13 +781,13 @@ export default function TestPage() {
     try {
       await injected.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: BSC_TESTNET_PARAMS.chainId }],
+        params: [{ chainId: CHAIN_CONFIGS['bsc'].chainId }],
       })
     } catch (switchError: unknown) {
       if (switchError && typeof switchError === 'object' && 'code' in switchError && switchError.code === 4902) {
         await injected.request({
           method: 'wallet_addEthereumChain',
-          params: [BSC_TESTNET_PARAMS],
+          params: [CHAIN_CONFIGS['bsc']],
         })
       } else {
         throw switchError
@@ -956,7 +940,7 @@ export default function TestPage() {
       const provider = await getProvider()
       const network = await provider.getNetwork()
       addLog(`当前网络: ${network.name} (chainId: ${network.chainId})`, 'success')
-      const currentChainKey = (findChainKeyById(Number(network.chainId)) || selectedChain) as 'ethereum'|'bsc'|'arbitrum'|'bsc-testnet'
+      const currentChainKey = (findChainKeyById(Number(network.chainId)) || selectedChain) as 'ethereum'|'bsc'|'arbitrum'
       setSelectedChain(currentChainKey)
       updateMetrics({ networkSwitched: true, currentStep: 2 })
 
@@ -1296,7 +1280,6 @@ export default function TestPage() {
               { name: 'ethereum', displayName: 'Ethereum', isEvm: true },
               { name: 'bsc', displayName: 'BSC', isEvm: true },
               { name: 'arbitrum', displayName: 'Arbitrum', isEvm: true },
-              { name: 'bsc-testnet', displayName: 'BSC Testnet', isEvm: true },
               { name: 'solana', displayName: 'Solana', isEvm: false }
             ].map(({ name, displayName, isEvm }) => {
               const status = rpcStatus[name]

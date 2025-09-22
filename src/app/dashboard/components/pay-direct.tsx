@@ -5,16 +5,15 @@ import * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { API_BASE } from '@/lib/api'
 import { ethers } from 'ethers'
 
 const TOKENS = {
-  // BSC Testnet 常用 USDT
-  USDT: '0x337610d27c682E347C9cD60BD4b3b107C9d34dDd',
+  // BSC 主网 USDT（示例）
+  USDT: '0x55d398326f99059fF775485246999027B3197955',
   // 如需更换，请在输入框中覆盖
-  USDC: '0x64544969ed7EBf5f083679233325356EbE738930',
+  USDC: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
 } as const
 
 const RECEIVER = '0x46d2d17d0e835a7f3a2269c9ad0d80d859996d63'
@@ -31,21 +30,20 @@ async function getProvider(): Promise<ethers.BrowserProvider> {
   return provider
 }
 
-async function ensureBscTestnet(injected: any){
-  const targetChainIdHex = '0x61' // 97
+async function ensureBsc(injected: any){
+  const targetChainIdHex = '0x38' // 56
   try{
     const current = await injected.request({ method: 'eth_chainId' })
     if(current?.toLowerCase() === targetChainIdHex){ return }
     await injected.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: targetChainIdHex }] })
   }catch(e:any){
-    // 4902: Unrecognized chain
     if(e?.code === 4902){
       await injected.request({ method: 'wallet_addEthereumChain', params: [{
         chainId: targetChainIdHex,
-        chainName: 'BNB Smart Chain Testnet',
-        nativeCurrency: { name: 'BNB', symbol: 'tBNB', decimals: 18 },
-        rpcUrls: ['https://bsc-testnet.blockpi.network/v1/rpc/public'],
-        blockExplorerUrls: ['https://testnet.bscscan.com']
+        chainName: 'BNB Smart Chain',
+        nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+        rpcUrls: ['https://bsc-dataseed1.binance.org'],
+        blockExplorerUrls: ['https://bscscan.com']
       }]})
     } else {
       throw e
@@ -88,14 +86,13 @@ export function PayDirect() {
       setLoading(true)
       const injected = getInjected()
       if(!injected){ throw new Error('未检测到钱包插件（OKX/MetaMask 等）') }
-      // 主动请求账户
       const accs = await injected.request({ method: 'eth_requestAccounts' })
       setAccount(accs?.[0] || '')
-      await ensureBscTestnet(injected)
+      await ensureBsc(injected)
       const provider = await getProvider()
       const network = await provider.getNetwork()
-      if(Number(network.chainId) !== 97){
-        throw new Error('请切换到 BSC Testnet (chainId 97)')
+      if(Number(network.chainId) !== 56){
+        throw new Error('请切换到 BSC Mainnet (chainId 56)')
       }
       const signer = await provider.getSigner()
       const sender = await signer.getAddress()
@@ -105,21 +102,17 @@ export function PayDirect() {
       if(!Number.isFinite(value) || value <= 0){ throw new Error('请输入正确金额') }
       const units = ethers.parseUnits(value.toFixed(2), decimals)
 
-      // 提前校验余额，避免 estimateGas 报错
       const balance = await getBalance(token, sender, provider)
-      if(balance < units){
-        throw new Error('余额不足：请获取该测试代币，或降低金额')
-      }
+      if(balance < units){ throw new Error('余额不足：请获取该代币，或降低金额') }
 
       // after_block & deadline
       const currentBlock = await provider.getBlockNumber()
       const after_block = String(currentBlock)
       const deadline = String(Math.floor(Date.now()/1000) + 60*10)
-      const blockchain = Number(network.chainId) === 97 ? 'bsc-testnet' : 'bsc'
+      const blockchain = 'bsc'
 
-      // attempts: store expected amount
       await fetch(`${API_BASE}/api/payments/attempts`, {
-        method:'POST', headers:{'Content-Type':'application/json'},
+        method:'POST', headers:{'Content-Type':'application/json', 'X-API-Key': process.env.NEXT_PUBLIC_API_KEY || ''},
         body: JSON.stringify({
           blockchain, sender, receiver: RECEIVER,
           to_token: token, to_amount: value.toString(), to_decimals: decimals,
@@ -127,7 +120,6 @@ export function PayDirect() {
         })
       })
 
-      // ERC20 transfer
       const erc20 = new ethers.Contract(token, [
         'function transfer(address to,uint256 value) returns (bool)'
       ], signer)
@@ -136,10 +128,9 @@ export function PayDirect() {
       const txHash = tx.hash
       setLastTx(txHash)
 
-      // poll status
       const poll = async()=>{
         const res = await fetch(`${API_BASE}/api/payments/status`, {
-          method:'POST', headers:{'Content-Type':'application/json'},
+          method:'POST', headers:{'Content-Type':'application/json', 'X-API-Key': process.env.NEXT_PUBLIC_API_KEY || ''},
           body: JSON.stringify({
             blockchain, transaction: txHash, sender, receiver: RECEIVER,
             to_token: token, after_block, deadline
@@ -159,7 +150,7 @@ export function PayDirect() {
       if(result?.status === 'success'){
         try{
           await fetch(`${API_BASE}/api/orders/${orderId}/payments/notify`, {
-            method:'POST', headers:{'Content-Type':'application/json'},
+            method:'POST', headers:{'Content-Type':'application/json', 'X-API-Key': process.env.NEXT_PUBLIC_API_KEY || ''},
             body: JSON.stringify({ txHash: txHash, chain: blockchain })
           })
         }catch{}
@@ -167,11 +158,7 @@ export function PayDirect() {
         setLastStatus('success')
       }else{
         const reason = result?.failed_reason || 'UNKNOWN'
-        if(reason === 'UNSUPPORTED_CHAIN'){
-          toast.error('支付失败: 后端未配置该链 RPC（UNSUPPORTED_CHAIN）。请设置 BSC_TESTNET_RPC 并重启后端。')
-        }else{
-          toast.error(`支付失败: ${reason}`)
-        }
+        toast.error(`支付失败: ${reason}`)
         setLastStatus(`failed(${reason})`)
       }
     }catch(e:any){
@@ -185,7 +172,7 @@ export function PayDirect() {
   return (
     <Card className="border-white/10 bg-card/50">
       <CardContent className="p-4 flex flex-col gap-2">
-        <div className="text-sm text-muted-foreground">BSC Testnet 直转测试 (ERC20 transfer)</div>
+        <div className="text-sm text-muted-foreground">BSC Mainnet 直转测试 (ERC20 transfer)</div>
         <div className="text-xs text-muted-foreground">Receiver: {RECEIVER}</div>
         <div className="text-xs text-muted-foreground">Account: {account || '未连接'}</div>
         {lastTx && (
@@ -203,17 +190,10 @@ export function PayDirect() {
           />
           <Input
             value={amount}
-            onChange={(e)=>{ const v=e.target.value; if(/^\d*(?:\.\d{0,2})?$/.test(v)) setAmount(v) }}
+            onChange={(e)=>{ const v=e.target.value; if(/^[0-9]+(?:\.[0-9]{0,2})?$/.test(v)) setAmount(v) }}
             placeholder="Amount"
             className="w-32"
           />
-          <Select value={symbol} onValueChange={(v)=>setSymbol(v as any)}>
-            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="USDT">USDT</SelectItem>
-              <SelectItem value="USDC">USDC</SelectItem>
-            </SelectContent>
-          </Select>
           <Input
             value={contractAddr}
             onChange={(e)=>setContractAddr(e.target.value)}
