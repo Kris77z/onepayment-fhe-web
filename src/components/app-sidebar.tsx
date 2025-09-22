@@ -35,7 +35,7 @@ export function AppSidebar({ onPageChange, currentPage, ...props }: AppSidebarPr
   const user = {
     name: "OnePay User",
     email: "user@onepay.com",
-    avatar: "/avatar/1.png",
+    avatar: "/avatar/4.png",
   };
 
   const navMain = [
