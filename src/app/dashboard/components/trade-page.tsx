@@ -64,7 +64,7 @@ export function TradePage() {
               <div className="flex items-center justify-center py-20">
                 <div className="text-center">
                   <IconExchange className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium text-muted-foreground">Coming Soon</h3>
+                <h3 className="text-lg font-medium text-muted-foreground">Swap is coming soon. Direct Send is available below.</h3>
                   <p className="text-sm text-muted-foreground mt-2">Token swap feature is under development</p>
                 </div>
               </div>
