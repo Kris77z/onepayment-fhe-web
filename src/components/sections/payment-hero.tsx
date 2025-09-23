@@ -8,10 +8,9 @@ import Link from "next/link";
 
 export default function PaymentHero() {
   const { toast } = useToast();
-  
-  const handleComingSoon = (e: React.MouseEvent) => {
+  const goAuth = (e: React.MouseEvent) => {
     e.preventDefault();
-    toast.info("Coming Soon!", "The product is about to be launched, please look forward to it！");
+    window.location.href = '/auth';
   };
 
   return (
@@ -39,7 +38,7 @@ export default function PaymentHero() {
           
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <Button size="lg" className="text-base px-8 py-3 h-auto" onClick={handleComingSoon}>
+            <Button size="lg" className="text-base px-8 py-3 h-auto" onClick={goAuth}>
               GET STARTED
               <ArrowRight className="ml-2 w-4 h-4" />
             </Button>

@@ -15,9 +15,9 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const handleComingSoon = (e: React.MouseEvent) => {
+  const goAuth = (e: React.MouseEvent) => {
     e.preventDefault();
-    toast.info("Coming Soon!", "The product is about to be launched, please look forward to it！");
+    window.location.href = '/auth';
   };
 
 
@@ -43,8 +43,8 @@ export default function Navbar() {
               </div>
             </Link>
             <div className="hidden md:flex items-center gap-4">
-              <button
-                onClick={handleComingSoon}
+              <Link
+                href="/dashboard"
                 className={`group inline-flex h-10 w-max items-center justify-center rounded-md px-4 py-2 font-medium text-sm transition-colors focus:outline-none disabled:pointer-events-none disabled:opacity-50 ${
                   isScrolled
                     ? "text-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
@@ -52,7 +52,7 @@ export default function Navbar() {
                 }`}
               >
                 Trade
-              </button>
+              </Link>
               <a
                 href="/payments"
                 className={`group inline-flex h-10 w-max items-center justify-center rounded-md px-4 py-2 font-medium text-sm transition-colors focus:outline-none disabled:pointer-events-none disabled:opacity-50 ${
@@ -64,7 +64,7 @@ export default function Navbar() {
                 Payments
               </a>
               <button
-                onClick={handleComingSoon}
+                onClick={goAuth}
                 className={`transition-colors duration-300 rounded-md px-4 py-2 text-sm ${
                   isScrolled
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"

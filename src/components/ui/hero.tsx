@@ -48,9 +48,9 @@ export const PremiumHero = () => {
   const LAYERS = 3;
   const BEAMS_PER_LAYER = 8;
 
-  const handleComingSoon = (e: React.MouseEvent) => {
+  const goAuth = (e: React.MouseEvent) => {
     e.preventDefault();
-    toast.info("Coming Soon!", "The product is about to be launched, please look forward to it！");
+    window.location.href = '/auth';
   };
 
   useEffect(() => {
@@ -167,7 +167,7 @@ export const PremiumHero = () => {
             </p>
 
             <div className="flex flex-row gap-3 flex-wrap justify-center">
-              <Button size="sm" className="gap-4" onClick={handleComingSoon}>
+              <Button size="sm" className="gap-4" onClick={goAuth}>
                 Start Integration <MoveRight className="w-4 h-4" />
               </Button>
             <Button size="sm" className="gap-4" variant="outline" asChild>

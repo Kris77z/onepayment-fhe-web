@@ -5,18 +5,17 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Footer() {
   const { toast } = useToast();
-  
-  const handleComingSoon = (e: React.MouseEvent) => {
+  const goAuth = (e: React.MouseEvent) => {
     e.preventDefault();
-    toast.info("Coming Soon!", "The product is about to be launched, please look forward to it！");
+    window.location.href = '/auth';
   };
 
   const sections = [
     {
       title: "Services",
       links: [
-        { name: "Buy Crypto", href: "#buy-crypto", comingSoon: true },
-        { name: "Trade", href: "#trade", comingSoon: true },
+        { name: "Buy Crypto", href: "/auth", comingSoon: false },
+        { name: "Trade", href: "/dashboard/trade", comingSoon: false },
         { name: "Payments", href: "/payments", comingSoon: false },
       ],
     },
@@ -60,9 +59,7 @@ export default function Footer() {
                   {section.links.map((link) => (
                     <li key={link.name} className="font-medium hover:text-primary">
                       {link.comingSoon ? (
-                        <button onClick={handleComingSoon} className="cursor-pointer">
-                          {link.name}
-                        </button>
+                        <button onClick={goAuth} className="cursor-pointer">{link.name}</button>
                       ) : (
                         <a href={link.href}>{link.name}</a>
                       )}
