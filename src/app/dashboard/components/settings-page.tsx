@@ -105,8 +105,8 @@ export function SettingsPage() {
   const curlCreateOrder = `curl -X POST ${base}/api/orders \\
   -H 'Content-Type: application/json' \\
   -H 'X-API-Key: ${APIKEY_PLACEHOLDER}' \\
-  -d '{"id":"ORDER_001","chain":"bsc-testnet","token_symbol":"USDT","token_address":"0x337610d27c682E347C9cD60BD4b3b107C9d34dDd","decimals":18,"expected_amount":"20.00"}'`
-  const nodeCreateOrder = `const res = await fetch('${base}/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': '${APIKEY_PLACEHOLDER}' }, body: JSON.stringify({ id: 'ORDER_001', chain: 'bsc-testnet', token_symbol: 'USDT', token_address: '0x337610d27c682E347C9cD60BD4b3b107C9d34dDd', decimals: 18, expected_amount: '20.00' }) });\nconst data = await res.json();\nconsole.log(data);`
+  -d '{"id":"ORDER_001","chain":"bsc","token_symbol":"USDT","token_address":"0x55d398326f99059fF775485246999027B3197955","decimals":18,"expected_amount":"20.00"}'`
+  const nodeCreateOrder = `const res = await fetch('${base}/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': '${APIKEY_PLACEHOLDER}' }, body: JSON.stringify({ id: 'ORDER_001', chain: 'bsc', token_symbol: 'USDT', token_address: '0x55d398326f99059fF775485246999027B3197955', decimals: 18, expected_amount: '20.00' }) });\nconst data = await res.json();\nconsole.log(data);`
 
   // Payment URL Generator state
   const [genChain, setGenChain] = useState('bsc')

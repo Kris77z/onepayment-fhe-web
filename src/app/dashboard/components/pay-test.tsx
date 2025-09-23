@@ -44,7 +44,7 @@ async function startPayment(tokenAddress: string, amount: number) {
   await window.DePayWidgets.Payment({
     accept: [{
       // 注意：若报“unsupported blockchain”，请切换为 'bsc'（主网）
-      blockchain: 'bsc-testnet',
+      blockchain: 'bsc',
       token: tokenAddress,
       amount,
       receiver: RECEIVER,

@@ -683,7 +683,7 @@ export default function TestPage() {
       const tokenAddress = normalizeAddress(await getTokenAddress())
       const after_block = '0'
       const deadline = Math.floor(Date.now() / 1000 + 600).toString()
-      const blockchain = 'bsc-testnet'
+      const blockchain = 'bsc'
       const statusPayload = { blockchain, transaction: txHash, sender: '', receiver: RECEIVER, to_token: tokenAddress, after_block, deadline }
       addLog(`手动校验 txHash 请求: ${JSON.stringify(statusPayload)}`)
       const res = await fetch(`${API_BASE}/api/payments/status?orderId=${encodeURIComponent(orderId)}`, {
@@ -1598,7 +1598,7 @@ export default function TestPage() {
                   if (!lastTx) { toast.warning('没有交易记录'); return }
                   if (selectedChain === 'solana') {
                     window.open(`https://solscan.io/tx/${lastTx}`, '_blank')
-                  } else if (selectedChain === 'bsc-testnet') {
+                  } else if (selectedChain === 'bsc') {
                     window.open(`https://testnet.bscscan.com/tx/${lastTx}`, '_blank')
                   } else if (selectedChain === 'bsc') {
                     window.open(`https://bscscan.com/tx/${lastTx}`, '_blank')

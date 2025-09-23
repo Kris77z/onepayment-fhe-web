@@ -37,7 +37,7 @@ const MERCHANT_ID = process.env.NEXT_PUBLIC_MERCHANT_ID || 'demo-merchant'
 
 function explorerBase(chain: string): string | null {
   const c = chain.toLowerCase()
-  if(c === 'bsc-testnet') return 'https://testnet.bscscan.com/tx/'
+  // 仅主网
   if(c === 'bsc') return 'https://bscscan.com/tx/'
   if(c === 'ethereum') return 'https://etherscan.io/tx/'
   if(c === 'arbitrum') return 'https://arbiscan.io/tx/'
