@@ -13,11 +13,15 @@ function getEffectiveApiKey(): string {
 
 // Debug: log env once in browser (masked key)
 (function debugLogEnv(){
-  if (typeof window !== 'undefined' && !(window as any).__onepay_api_logged) {
+  if (typeof window !== 'undefined') {
+    // 为 window 增加类型以避免 any
+    declare global { interface Window { __onepay_api_logged?: boolean } }
+    if (!window.__onepay_api_logged) {
     const k = getEffectiveApiKey()
     const masked = k ? `${k.slice(0,4)}…${k.slice(-4)}` : '<empty>'
     console.info('[OnePay][api] BASE=%s KEY=%s', API_BASE || '<empty>', masked)
-    ;(window as any).__onepay_api_logged = true
+      window.__onepay_api_logged = true
+    }
   }
 })()
 
