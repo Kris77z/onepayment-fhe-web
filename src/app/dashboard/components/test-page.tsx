@@ -59,10 +59,10 @@ const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)'
 ]
 
-// 旧常量（兼容保留：BSC Testnet 默认 USDT）
+// 常量（主网默认：BSC）
 const TOKENS = {
-  USDT: '0x337610d27c682E347C9cD60BD4b3b107C9d34dDd',
-  USDC: ''
+  USDT: '0x55d398326f99059fF775485246999027B3197955',
+  USDC: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d'
 }
 
 const TOKEN_DECIMALS_DEFAULTS: Record<'USDT'|'USDC', number> = {
@@ -1599,8 +1599,6 @@ export default function TestPage() {
                   if (selectedChain === 'solana') {
                     window.open(`https://solscan.io/tx/${lastTx}`, '_blank')
                   } else if (selectedChain === 'bsc') {
-                    window.open(`https://testnet.bscscan.com/tx/${lastTx}`, '_blank')
-                  } else if (selectedChain === 'bsc') {
                     window.open(`https://bscscan.com/tx/${lastTx}`, '_blank')
                   } else if (selectedChain === 'ethereum') {
                     window.open(`https://etherscan.io/tx/${lastTx}`, '_blank')
@@ -1646,7 +1644,7 @@ export default function TestPage() {
                     setSelectedToken('USDT')
                   }}
                 >
-                  USDT Testnet
+                  USDT (BSC)
                 </Button>
                 <Button
                   variant="outline"
@@ -1656,7 +1654,7 @@ export default function TestPage() {
                     setSelectedToken('USDC')
                   }}
                 >
-                  USDC Testnet
+                  USDC (BSC)
                 </Button>
                 <Button
                   variant="outline"
