@@ -13,6 +13,8 @@ import { usePathname } from "next/navigation"
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
+import { useEffect, useState } from "react"
+import { getJson } from "@/lib/api"
 import {
   Sidebar,
   SidebarContent,
@@ -32,11 +34,15 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 export function AppSidebar({ onPageChange, currentPage, ...props }: AppSidebarProps) {
   const pathname = usePathname()
-  const user = {
-    name: "OnePay User",
-    email: "user@onepay.com",
-    avatar: "/avatar/4.png",
-  };
+  const [user, setUser] = useState({ name: "OnePay User", email: "user@onepay.com", avatar: "/avatar/4.png" })
+
+  useEffect(()=>{
+    let mounted = true
+    ;(async()=>{
+      try{ const me = await getJson<{ email:string }>(`/me`) ; if(mounted && me?.email){ setUser(u=>({ ...u, email: me.email })) } }catch{}
+    })()
+    return ()=>{ mounted=false }
+  },[])
 
   const navMain = [
     {

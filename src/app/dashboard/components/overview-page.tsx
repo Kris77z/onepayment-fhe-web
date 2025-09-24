@@ -9,10 +9,8 @@ export function OverviewPage() {
     <div className="flex flex-col gap-4">
       {/* Overview cards - income, expenses, users, growth */}
       <SectionCards />
-      
       {/* 交互式图表 */}
       <ChartAreaInteractive />
-      
       {/* 交易历史表格 */}
       <PaymentsTable />
     </div>

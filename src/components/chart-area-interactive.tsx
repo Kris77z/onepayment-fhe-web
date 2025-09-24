@@ -34,7 +34,7 @@ export const description = "Revenue series"
 
 type SeriesResp = { series: { date: string; value: number }[]; days: number }
 
-const MERCHANT_ID = process.env.NEXT_PUBLIC_MERCHANT_ID || 'demo-merchant'
+// 改为会话端点，无需 MERCHANT_ID
 
 const chartConfig = {
   visitors: { label: "Revenue" },
@@ -61,7 +61,7 @@ export function ChartAreaInteractive() {
       try{
         setLoading(true)
         const days = timeRange === '7d' ? 7 : 30
-        const resp = await getJson<SeriesResp>(`/api/dashboard/${encodeURIComponent(MERCHANT_ID)}/revenue-series?days=${days}`)
+        const resp = await getJson<SeriesResp>(`/me/dashboard/revenue-series?days=${days}`)
         if(!cancelled){ setSeries(resp.series || []) }
       }catch(e){ if(!cancelled){ setError(e instanceof Error ? e.message : String(e)) } }
       finally{ if(!cancelled){ setLoading(false) } }

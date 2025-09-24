@@ -8,10 +8,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { postJson } from "@/lib/api";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SignupPage() {
   const [loading, setLoading] = React.useState(false);
+  const { toast } = useToast();
+
+  function getErrorMessage(err: unknown): string {
+    if (typeof err === 'object' && err !== null) {
+      const e = err as { data?: { error?: string }; message?: string };
+      return e?.data?.error || e?.message || 'Registration failed. Please try another email.';
+    }
+    return String(err || 'Registration failed');
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -21,21 +30,29 @@ export default function SignupPage() {
     const password = String(data.get('password') || '');
     const confirm = String(data.get('confirm') || '');
     if(!email || !password){
-      toast.error('Please enter email and password');
+      toast.error('Validation', 'Please enter email and password');
       return;
     }
     if(password !== confirm){
-      toast.error('Passwords do not match');
+      toast.error('Validation', 'Passwords do not match');
       return;
     }
     try{
       setLoading(true);
-      await postJson('/auth/register', { email, password });
-      const redirect = new URLSearchParams(window.location.search).get('redirect') || '/dashboard';
-      window.location.href = redirect;
-    }catch(err){
+      console.log('Attempting registration with:', { email });
+      const result = await postJson('/auth/register', { email, password });
+      console.log('Registration successful:', result);
+      toast.success('Registration successful', 'Redirecting...');
+      
+      // 延迟一下让用户看到成功消息
+      setTimeout(() => {
+        const redirect = new URLSearchParams(window.location.search).get('redirect') || '/dashboard';
+        window.location.href = redirect;
+      }, 1000);
+    }catch(err: unknown){
       console.error('Register failed', err);
-      toast.error('Register failed. Try another email.');
+      const errorMsg = getErrorMessage(err);
+      toast.error('Register failed', errorMsg);
     } finally {
       setLoading(false);
     }

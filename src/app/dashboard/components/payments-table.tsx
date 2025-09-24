@@ -33,7 +33,7 @@ type ListResp = {
   pageSize: number
 }
 
-const MERCHANT_ID = process.env.NEXT_PUBLIC_MERCHANT_ID || 'demo-merchant'
+// 改为会话端点，无需 MERCHANT_ID
 
 function explorerBase(chain: string): string | null {
   const c = chain.toLowerCase()
@@ -67,7 +67,7 @@ export default function PaymentsTable(){
       // 默认近30天
       qs.set('range', '30d')
       qs.set('includeFees', 'true')
-      const data = await getJson<ListResp>(`/api/merchants/${encodeURIComponent(MERCHANT_ID)}/payments?${qs.toString()}`)
+      const data = await getJson<ListResp>(`/me/payments?${qs.toString()}`)
       setResp(data)
     }catch(e){ setError(e instanceof Error ? e.message : String(e)) }
     finally{ setLoading(false) }
@@ -105,7 +105,7 @@ export default function PaymentsTable(){
       if(search.trim()) qs.set('search', search.trim())
       qs.set('range', '30d')
       qs.set('includeFees', 'true')
-      const data = await getJson<ListResp>(`/api/merchants/${encodeURIComponent(MERCHANT_ID)}/payments?${qs.toString()}`)
+      const data = await getJson<ListResp>(`/me/payments?${qs.toString()}`)
       const csv = toCsv(data?.items||[])
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
       const url = URL.createObjectURL(blob)

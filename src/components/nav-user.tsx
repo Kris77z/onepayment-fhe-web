@@ -7,6 +7,7 @@ import {
   IconNotification,
   IconUserCircle,
 } from "@tabler/icons-react"
+import { useToast } from "@/hooks/use-toast"
 
 import {
   Avatar,
@@ -39,6 +40,16 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const { toast } = useToast()
+  
+  async function handleLogout(){
+    try{
+      await fetch(`${process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, '')}/auth/logout`, { method:'POST', credentials:'include' })
+    }catch{}
+    try{ sessionStorage.removeItem('onepay_override_api_key') }catch{}
+    toast.success('Logged out', 'Redirecting to login...')
+    setTimeout(()=>{ window.location.href = '/auth' }, 600)
+  }
 
   return (
     <SidebarMenu>
@@ -83,7 +94,7 @@ export function NavUser({
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
               <IconLogout />
               Log out
             </DropdownMenuItem>

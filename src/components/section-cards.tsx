@@ -13,7 +13,7 @@ type OverviewResp = {
   period: { from: string; to: string }
 }
 
-const MERCHANT_ID = process.env.NEXT_PUBLIC_MERCHANT_ID || 'demo-merchant'
+// 切换到会话端点，不再使用 MERCHANT_ID 常量
 
 export function SectionCards() {
   const [data, setData] = useState<OverviewResp | null>(null)
@@ -25,7 +25,7 @@ export function SectionCards() {
     ;(async () => {
       try{
         setLoading(true)
-        const resp = await getJson<OverviewResp>(`/api/dashboard/${encodeURIComponent(MERCHANT_ID)}/overview?range=30d`)
+        const resp = await getJson<OverviewResp>(`/me/dashboard/overview?range=30d`)
         if(!cancelled) setData(resp)
       }catch(e){ if(!cancelled) setError(e instanceof Error ? e.message : String(e)) }
       finally{ if(!cancelled) setLoading(false) }

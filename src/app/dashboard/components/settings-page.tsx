@@ -28,6 +28,7 @@ import {
   IconLock
 } from "@tabler/icons-react";
 import { postJson, getJson } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 // Types
 type MerchantPreferences = {
@@ -45,6 +46,7 @@ type MerchantInfo = {
   id: string
   name: string
   api_key_masked: string
+  api_key?: string
   webhook_url: string
   fee_bps: number
   status: string
@@ -57,6 +59,7 @@ type ApiError = Error & { status?: number; data?: { error?: string } }
 
 export function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle')
   const [notifications, setNotifications] = useState({
     email: true,
     push: false,
@@ -72,6 +75,7 @@ export function SettingsPage() {
   const [merchant, setMerchant] = useState<null | MerchantInfo>(null)
   const [overrideApiKey, setOverrideApiKey] = useState<string>('')
   const [newApiKey, setNewApiKey] = useState<string>('')
+  const [revealedApiKey, setRevealedApiKey] = useState<string>('')
   const [webhookUrl, setWebhookUrl] = useState<string>('')
   const [failedWebhooks, setFailedWebhooks] = useState<Array<FailedWebhookItem>>([])
   const [failedLoading, setFailedLoading] = useState(false)
@@ -86,36 +90,68 @@ export function SettingsPage() {
     try{ await postJson(`/api/merchant/preferences`, { [key]: value }, { headers: apiHeaders() }) }catch{}
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    // TODO: Add toast notification
-  };
+  const copyToClipboard = async (text: string) => {
+    if (!text) return
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopyState('copied')
+      setTimeout(() => setCopyState('idle'), 2000)
+    } catch (error) {
+      console.error('copy failed', error)
+    }
+  }
+  async function handleToggleApiVisibility(){
+    const next = !showApiKey
+    if(next){
+      try{
+        // 如果已有明文（旋转产生的新 Key 或此前已揭示），直接展示
+        if(revealedApiKey || newApiKey || overrideApiKey || merchant?.api_key){
+          setShowApiKey(true)
+          return
+        }
+        // 会话态揭示（无 2FA），由后端做冷却与审计
+        const res = await postJson<{ api_key: string; expires_at?: string }>(`/me/merchant/api-key/reveal`, {})
+        if(res?.api_key){ setRevealedApiKey(res.api_key); setShowApiKey(true); return }
+      }catch(e){ console.error('reveal failed', (e as any)?.message) }
+    }
+    setShowApiKey(next)
+  }
+
 
 
   // API Quickstart envs (dev convenience)
   const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '')
-  const MERCHANT_ID = process.env.NEXT_PUBLIC_MERCHANT_ID || ''
-  const API_KEY = process.env.NEXT_PUBLIC_API_KEY || ''
-  const maskedKey = API_KEY ? `${API_KEY.slice(0,4)}••••••••${API_KEY.slice(-4)}` : ''
-  const base = API_BASE || 'http://localhost:3002'
+  const MERCHANT_ID = ''
+  const API_KEY: string = ''
+  const maskedKey: string = API_KEY && API_KEY.length >= 8 ? `${API_KEY.slice(0,4)}••••••••${API_KEY.slice(-4)}` : ''
+  const base = 'https://api.onepayment.pro/v1'
   const MERCHANT_PLACEHOLDER = MERCHANT_ID || '<YOUR_MERCHANT_ID>'
   const APIKEY_PLACEHOLDER = API_KEY || '<YOUR_API_KEY>'
   const EVM_DEFAULT_RECEIVER = '0x2f28db7b3a6f62f0c425f0196db2dfea29d824a0'
   const SOL_DEFAULT_RECEIVER = 'DVgDzRZpwM4iNbMihUiTyhy6FVE6SBYeSGiXqtaSpcST'
-  const curlCreateOrder = `curl -X POST ${base}/api/orders \\
+
+  // Builders: invoice (per-order) & static (long-lived)
+  const buildCurlInvoice = (chain:string, token:string, amount:string)=>`curl -X POST ${base}/payment/invoices \\
   -H 'Content-Type: application/json' \\
   -H 'X-API-Key: ${APIKEY_PLACEHOLDER}' \\
-  -d '{"id":"ORDER_001","chain":"bsc","token_symbol":"USDT","token_address":"0x55d398326f99059fF775485246999027B3197955","decimals":18,"expected_amount":"20.00"}'`
-  const nodeCreateOrder = `const res = await fetch('${base}/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': '${APIKEY_PLACEHOLDER}' }, body: JSON.stringify({ id: 'ORDER_001', chain: 'bsc', token_symbol: 'USDT', token_address: '0x55d398326f99059fF775485246999027B3197955', decimals: 18, expected_amount: '20.00' }) });\nconst data = await res.json();\nconsole.log(data);`
+  -d '{"chain":"${chain}","token_symbol":"${token}","expected_amount":"${amount}"}'`
+  const buildNodeInvoice = (chain:string, token:string, amount:string)=>`const BASE='${base}';\nconst API_KEY=process.env.ONEPAY_API_KEY;\nconst res = await fetch(\`${'${BASE}'}/payment/invoices\`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY }, body: JSON.stringify({ chain: '${'${chain}'}', token_symbol: '${'${token}'}', expected_amount: '${'${amount}'}' }) });\nconst data = await res.json();\n// { order_id, pay_url, qrcode_text, deep_link }\nconsole.log(data);`
+
+  const buildCurlStatic = (chain:string, token:string, amount:string)=>`curl -X POST ${base}/payment/static \\
+  -H 'Content-Type: application/json' \\
+  -H 'X-API-Key: ${APIKEY_PLACEHOLDER}' \\
+  -d '{"chain":"${chain}","token_symbol":"${token}","amount":"${amount}"}'`
+  const buildNodeStatic = (chain:string, token:string, amount:string)=>`const BASE='${base}';\nconst API_KEY=process.env.ONEPAY_API_KEY;\nconst res = await fetch(\`${'${BASE}'}/payment/static\`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY }, body: JSON.stringify({ chain: '${'${chain}'}', token_symbol: '${'${token}'}', amount: '${'${amount}'}' }) });\nconst data = await res.json();\n// { deep_link, qrcode_text }\nconsole.log(data);`
+  const buildHtmlStatic = () => `<img src="${base}/payment/qr?text={URL_ENCODED_DEEP_LINK}" alt="Pay QR" width="256" height="256" />\n<!-- Replace {URL_ENCODED_DEEP_LINK} with encodeURIComponent(deep_link) on your server-side -->`
 
   // Payment URL Generator state
   const [genChain, setGenChain] = useState('bsc')
   const [genToken, setGenToken] = useState<'USDT'|'USDC'>('USDT')
   const [genAmount, setGenAmount] = useState('20.00')
-  const [genFixed, setGenFixed] = useState(true)
-  const [genResult, setGenResult] = useState<{pay_url?:string;deep_link?:string;qrcode_text?:string;error?:string}|null>(null)
+  const [genResult, setGenResult] = useState<{curl?:string;node?:string;html?:string;error?:string}|null>(null)
   const [genLoading, setGenLoading] = useState(false)
   const [orderExpiryMin, setOrderExpiryMin] = useState<number>(15)
+  const [genMode, setGenMode] = useState<'invoice'|'static'>('invoice')
 
   // Chain configs with logos
   const chainConfigs = {
@@ -133,37 +169,38 @@ export function SettingsPage() {
 
 
   async function handleGenerate(){
+    setGenLoading(true)
+    setGenResult(null)
     try{
-      setGenLoading(true)
-      setGenResult(null)
-      const body = {
-        id: `DEMO_${Date.now()}`,
-        chain: genChain,
-        token_symbol: genToken,
-        expected_amount: genAmount,
-        // Default expiry time (minutes)
-        deadline: Math.floor(Date.now()/1000 + Math.max(1, orderExpiryMin)*60)
+      if(genMode === 'invoice'){
+        setGenResult({
+          curl: buildCurlInvoice(genChain, genToken, genAmount),
+          node: buildNodeInvoice(genChain, genToken, genAmount),
+        })
+      }else{
+        setGenResult({
+          curl: buildCurlStatic(genChain, genToken, genAmount),
+          node: buildNodeStatic(genChain, genToken, genAmount),
+          html: buildHtmlStatic(),
+        })
       }
-      const resp = await postJson<{pay_url?: string; deep_link?: string; qrcode_text?: string}>(`/api/orders`, body, { headers: apiHeaders() })
-      setGenResult({ pay_url: resp?.pay_url, deep_link: resp?.deep_link, qrcode_text: resp?.qrcode_text })
     }catch(e: unknown){
       const err = e as ApiError
-      const errorMessage = err?.data?.error || (e as Error)?.message || 'Generate failed'
-      setGenResult({ error: errorMessage })
-    }finally{
-      setGenLoading(false)
-    }
+      setGenResult({ error: err?.data?.error || (e as Error)?.message || 'Generate failed' })
+    }finally{ setGenLoading(false) }
   }
 
   // Helpers
   function apiHeaders(): Record<string, string> {
+    // 会话端点无需 API KEY；保留覆写选项以便开发联调
     return overrideApiKey ? { 'X-API-Key': overrideApiKey } : {}
   }
 
   async function loadMerchant(){
     try{
       setMerchantLoading(true)
-      const data = await getJson<MerchantInfo>(`/api/merchant/self`, { headers: apiHeaders() })
+      // 优先会话端点
+      const data = await getJson<MerchantInfo>(overrideApiKey ? `/api/merchant/self` : `/me/merchant`, { headers: apiHeaders() })
       setMerchant(data)
       setWebhookUrl(data?.webhook_url || '')
       if(data?.preferences){ setNotifications((prev)=>({ ...prev, ...data.preferences })) }
@@ -194,7 +231,7 @@ export function SettingsPage() {
 
   async function rotateApiKey(){
     try{
-      const res = await postJson<{ api_key:string }>(`/api/merchant/api-keys/rotate`, {}, { headers: apiHeaders() })
+      const res = await postJson<{ api_key:string }>(overrideApiKey ? `/api/merchant/api-keys/rotate` : `/me/merchant/api-keys/rotate`, {}, { headers: apiHeaders() })
       if(res?.api_key){
         setNewApiKey(res.api_key)
         setOverrideApiKey(res.api_key)
@@ -205,14 +242,14 @@ export function SettingsPage() {
 
   async function saveWebhook(){
     try{
-      await postJson(`/api/merchant/webhook`, { webhook_url: webhookUrl }, { headers: apiHeaders() })
+      await postJson(overrideApiKey ? `/api/merchant/webhook` : `/me/merchant/webhook`, { webhook_url: webhookUrl }, { headers: apiHeaders() })
       await loadMerchant()
     }catch{}
   }
 
   async function testWebhook(){
     try{
-      await postJson(`/api/merchant/webhook/test`, {}, { headers: apiHeaders() })
+      await postJson(overrideApiKey ? `/api/merchant/webhook/test` : `/me/merchant/webhook/test`, {}, { headers: apiHeaders() })
       await loadFailedWebhooks()
     }catch{}
   }
@@ -221,7 +258,7 @@ export function SettingsPage() {
   async function setup2FA(){
     setTotpError(''); setTotpLoading(true)
     try{
-      const res = await postJson<{ otpauth:string; qrcode_data_url:string; secret_base32?: string }>(`/api/merchant/2fa/setup`, {}, { headers: apiHeaders() })
+      const res = await postJson<{ otpauth:string; qrcode_data_url:string; secret_base32?: string }>(overrideApiKey ? `/api/merchant/2fa/setup` : `/me/merchant/2fa/setup`, {}, { headers: apiHeaders() })
       setTotpSetup(res)
     }catch(e: unknown){
       const err = e as ApiError
@@ -232,7 +269,7 @@ export function SettingsPage() {
   async function verify2FA(){
     setTotpError(''); setTotpLoading(true)
     try{
-      await postJson(`/api/merchant/2fa/verify`, { code: totpCode }, { headers: apiHeaders() })
+      await postJson(overrideApiKey ? `/api/merchant/2fa/verify` : `/me/merchant/2fa/verify`, { code: totpCode }, { headers: apiHeaders() })
       setTotpSetup(null); setTotpCode(''); await loadMerchant()
     }catch(e: unknown){
       const err = (e as ApiError)
@@ -242,13 +279,13 @@ export function SettingsPage() {
   }
   async function disable2FA(){
     setTotpError(''); setTotpLoading(true)
-    try{ await postJson(`/api/merchant/2fa/disable`, {}, { headers: apiHeaders() }); await loadMerchant() }
+    try{ await postJson(overrideApiKey ? `/api/merchant/2fa/disable` : `/me/merchant/2fa/disable`, {}, { headers: apiHeaders() }); await loadMerchant() }
     catch(e: unknown){ const err=(e as ApiError); const m= err?.data?.error||(e as Error)?.message||'Disable failed'; setTotpError(String(m)) } 
     finally{ setTotpLoading(false) }
   }
   async function retryWebhook(id: string){
     try{
-      await postJson(`/api/webhooks/${encodeURIComponent(id)}/retry`, {}, { headers: apiHeaders() })
+      await postJson(overrideApiKey ? `/api/webhooks/${encodeURIComponent(id)}/retry` : `/me/webhooks/${encodeURIComponent(id)}/retry`, {}, { headers: apiHeaders() })
       await loadFailedWebhooks()
     }catch{}
   }
@@ -408,102 +445,80 @@ export function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Merchant & API Key</CardTitle>
-              <CardDescription>Manage your merchant configuration and API keys (please update environment variables after rotation).</CardDescription>
+              <CardDescription>Server-side API key for backend integration.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Merchant</div>
-                  <div className="text-sm font-medium">{merchantLoading ? 'Loading...' : (merchant?.name || 'N/A')}</div>
+                  <div className="text-sm text-muted-foreground">Merchant ID</div>
+                  <div className="text-sm font-medium font-mono">
+                    {merchantLoading ? 'Loading...' : (merchant?.id ? `${merchant.id.slice(0,6)}…${merchant.id.slice(-4)}` : 'N/A')}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">Status</div>
                   <div className="text-sm font-medium">{merchant?.status || '-'}</div>
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <div className="text-sm font-medium">API Key (Read-only Masked)</div>
-                  <div className="flex gap-2">
-                    <Input value={merchant?.api_key_masked || maskedKey} readOnly className="font-mono" />
-                    <Button variant="outline" size="sm" onClick={rotateApiKey}>
-                      <IconRefresh className="h-4 w-4 mr-2" />Rotate
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">API Key</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={handleToggleApiVisibility}
+                      aria-label={showApiKey ? 'Hide API Key' : 'Show API Key'}
+                    >
+                      {showApiKey ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
                     </Button>
                   </div>
-                </div>
-                {newApiKey && (
-                  <div className="space-y-2 md:col-span-2">
-                    <div className="text-sm font-medium">New API Key (One-time display, save immediately)</div>
-                    <div className="flex gap-2">
-                      <Input value={newApiKey} readOnly className="font-mono" />
-                      <Button variant="outline" size="sm" onClick={()=>copyToClipboard(newApiKey)}>
-                        <IconCopy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" onClick={()=>{ try{ sessionStorage.setItem('onepay_override_api_key', newApiKey); setOverrideApiKey(newApiKey) }catch{} }}>Use for this session</Button>
-                      <div className="text-xs text-muted-foreground">Requests from this page will carry X-API-Key.</div>
-                    </div>
-                    <div className="text-xs text-muted-foreground">Note: This page will use the new key for subsequent requests, but you still need to update it in your server/frontend environment variables.</div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={showApiKey ? (merchant?.api_key || revealedApiKey || newApiKey || overrideApiKey || merchant?.api_key_masked || '••••••') : (merchant?.api_key_masked || '••••••')}
+                      readOnly
+                      className="font-mono"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyToClipboard(merchant?.api_key || revealedApiKey || newApiKey || overrideApiKey || merchant?.api_key_masked || '')}
+                      className={cn(copyState === 'copied' && 'border-emerald-400 text-emerald-500')}
+                    >
+                      <IconCopy className="h-4 w-4 mr-2" />
+                      {copyState === 'copied' ? 'Copied' : 'Copy'}
+                    </Button>
                   </div>
-                )}
+                  {!showApiKey && (
+                    <p className="text-xs text-muted-foreground">Masked by default for security. Click the eye icon to reveal.</p>
+                  )}
+                </div>
+                {/* 移除 Rotate，仅保留复制按钮。若需重新签发请走后台运维流程 */}
               </div>
             </CardContent>
           </Card>
 
-          {/* Webhook Configuration */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Webhook</CardTitle>
-              <CardDescription>Configure callback URL and send test events (with HMAC signature).</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2 md:col-span-2">
-                  <div className="text-sm font-medium">Callback URL</div>
-                  <div className="flex gap-2">
-                    <Input value={webhookUrl} onChange={(e)=>setWebhookUrl(e.target.value)} placeholder="https://your.domain/webhook" />
-                    <Button variant="outline" size="sm" onClick={saveWebhook}>Save</Button>
-                    <Button size="sm" onClick={testWebhook}>Send Test</Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Webhook removed per product decision */}
 
           <Card>
             <CardContent className="space-y-6 pt-6">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <div className="text-sm font-medium">Base URL</div>
-                  <Input value={API_BASE} readOnly className="font-mono" />
-                </div>
-                <div className="space-y-3">
-                  <div className="text-sm font-medium">Merchant ID</div>
-                  <Input value={MERCHANT_ID || 'Auto-bound to your account'} readOnly className="font-mono" />
-                </div>
-                <div className="space-y-3 md:col-span-2">
-                  <div className="text-sm font-medium">API Key (server-side only)</div>
-                  <div className="flex gap-2">
-                    <Input value={maskedKey} readOnly className="font-mono" />
-                    <Button variant="outline" size="sm" onClick={()=>copyToClipboard(API_KEY)}><IconCopy className="h-4 w-4" /></Button>
-                  </div>
-                </div>
-              </div>
+              {/* 示例不再默认展示，改为下方生成后显示 */}
 
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <div className="text-sm font-medium">cURL Example</div>
-                  <pre className="rounded-lg border p-3 text-xs overflow-x-auto">{curlCreateOrder}</pre>
-                </div>
-                <div className="space-y-3">
-                  <div className="text-sm font-medium">Node.js Example</div>
-                  <pre className="rounded-lg border p-3 text-xs overflow-x-auto">{nodeCreateOrder}</pre>
-                </div>
-              </div>
-
-              {/* Payment URL Generator */}
-              <div className="space-y-3 pt-6 border-t">
-                <h3 className="text-lg font-medium">Payment URL Generator</h3>
+              {/* API Snippet Generator (Server-side only) */}
+              <div className="space-y-3 pt-2">
+                <h3 className="text-lg font-medium">API Snippet Generator</h3>
                 <div className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium">Mode</div>
+                    <Select value={genMode} onValueChange={(v)=>setGenMode(v as 'invoice'|'static')}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="invoice">Per-order (invoice)</SelectItem>
+                        <SelectItem value="static">Static Button (long-lived)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-3">
                     <div className="text-sm font-medium">Chain</div>
                     <Select value={genChain} onValueChange={setGenChain}>
@@ -554,30 +569,38 @@ export function SettingsPage() {
                     <div className="text-sm font-medium">Amount</div>
                     <Input value={genAmount} onChange={(e)=>setGenAmount(e.target.value)} placeholder="20.00" />
                   </div>
-                  <div className="space-y-3">
-                    <div className="text-sm font-medium">Order expiry (min)</div>
-                    <Input type="number" value={orderExpiryMin} onChange={(e)=> setOrderExpiryMin(Math.max(1, Number(e.target.value||15)))} />
-                  </div>
+                  {genMode === 'invoice' && (
+                    <div className="space-y-3">
+                      <div className="text-sm font-medium">Order expiry (min)</div>
+                      <Input type="number" value={orderExpiryMin} onChange={(e)=> setOrderExpiryMin(Math.max(1, Number(e.target.value||15)))} />
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={handleGenerate} disabled={genLoading}>{genLoading ? 'Generating...' : 'Generate'}</Button>
-                  {genResult?.pay_url && (
-                    <Button variant="outline" onClick={()=>copyToClipboard(genResult.pay_url!)}><IconCopy className="h-4 w-4 mr-2" />Copy pay_url</Button>
-                  )}
+                  <Button onClick={handleGenerate} disabled={genLoading}>{genLoading ? 'Generating...' : 'Generate Snippets'}</Button>
                 </div>
                 {genResult?.error && (
                   <div className="text-xs text-red-500">{genResult.error}</div>
                 )}
-                {(genResult?.pay_url || genResult?.deep_link) && (
-                  <div className="grid md:grid-cols-2 gap-4 text-xs">
-                    <div className="space-y-3">
-                      <div className="text-sm font-medium">pay_url</div>
-                      <pre className="rounded-lg border p-3 overflow-x-auto">{genResult?.pay_url}</pre>
+                {(!genResult?.error && genResult?.curl) && (
+                  <div className="space-y-5 text-xs">
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">cURL (Server)</div>
+                      <pre className="rounded-lg border p-3 overflow-x-auto">{genResult.curl}</pre>
+                      <Button variant="outline" size="sm" onClick={()=>copyToClipboard(genResult!.curl!)}><IconCopy className="h-4 w-4 mr-2"/>Copy cURL</Button>
                     </div>
-                    <div className="space-y-3">
-                      <div className="text-sm font-medium">deep_link</div>
-                      <pre className="rounded-lg border p-3 overflow-x-auto">{genResult?.deep_link}</pre>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Node.js (Server)</div>
+                      <pre className="rounded-lg border p-3 overflow-x-auto">{genResult.node}</pre>
+                      <Button variant="outline" size="sm" onClick={()=>copyToClipboard(genResult!.node!)}><IconCopy className="h-4 w-4 mr-2"/>Copy Node</Button>
                     </div>
+                    {genMode === 'static' && genResult?.html && (
+                      <div className="space-y-2">
+                        <div className="text-sm font-medium">HTML &lt;img&gt; (Client)</div>
+                        <pre className="rounded-lg border p-3 overflow-x-auto">{genResult.html}</pre>
+                        <Button variant="outline" size="sm" onClick={()=>copyToClipboard(genResult!.html!)}><IconCopy className="h-4 w-4 mr-2"/>Copy HTML</Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

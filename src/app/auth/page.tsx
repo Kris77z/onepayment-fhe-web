@@ -9,10 +9,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { postJson } from "@/lib/api";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AuthPage() {
   const [loading, setLoading] = React.useState(false);
+  const { toast } = useToast();
+
+  function getErrorMessage(err: unknown): string {
+    if (typeof err === 'object' && err !== null) {
+      const e = err as { data?: { error?: string }; message?: string };
+      return e?.data?.error || e?.message || 'Login failed. Please check your credentials.';
+    }
+    return String(err || 'Login failed');
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -21,17 +30,25 @@ export default function AuthPage() {
     const email = String(data.get('email') || '').trim();
     const password = String(data.get('password') || '');
     if(!email || !password){
-      toast.error('Please enter email and password');
+      toast.error('Validation', 'Please enter email and password');
       return;
     }
     try{
       setLoading(true);
-      await postJson('/auth/login', { email, password });
-      const redirect = new URLSearchParams(window.location.search).get('redirect') || '/dashboard';
-      window.location.href = redirect;
-    }catch(err){
+      console.log('Attempting login with:', { email });
+      const result = await postJson('/auth/login', { email, password });
+      console.log('Login successful:', result);
+      toast.success('Login successful', 'Redirecting...');
+      
+      // 延迟一下让用户看到成功消息
+      setTimeout(() => {
+        const redirect = new URLSearchParams(window.location.search).get('redirect') || '/dashboard';
+        window.location.href = redirect;
+      }, 1000);
+    }catch(err: unknown){
       console.error('Login failed', err);
-      toast.error('Login failed. Please check your credentials.');
+      const errorMsg = getErrorMessage(err);
+      toast.error('Login failed', errorMsg);
     } finally {
       setLoading(false);
     }

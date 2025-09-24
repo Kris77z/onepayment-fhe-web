@@ -34,18 +34,22 @@ function buildUrl(path: string, key: string): string {
   const base = `${API_BASE}${path}`
   try{
     const u = new URL(base)
-    if (key && !u.searchParams.has('api_key')) u.searchParams.set('api_key', key)
+    // 对 /me 与 /me/* 以及 /auth/* 端点不附加 api_key（避免泄露在 URL）
+    const skipKey = path.startsWith('/me') || path.startsWith('/auth/')
+    if (!skipKey && key && !u.searchParams.has('api_key')) u.searchParams.set('api_key', key)
     return u.toString()
   }catch{
     // relative or invalid URL, fallback简单拼接
     const sep = base.includes('?') ? '&' : '?'
-    return key ? `${base}${sep}api_key=${encodeURIComponent(key)}` : base
+    const skipKey = path.startsWith('/me') || path.startsWith('/auth/')
+    return (!skipKey && key) ? `${base}${sep}api_key=${encodeURIComponent(key)}` : base
   }
 }
 
 export async function postJson<T = unknown>(path: string, body: Json, init?: RequestInit): Promise<T> {
   const effKey = getEffectiveApiKey()
   const url = buildUrl(path, effKey)
+  // 临时：始终携带 X-API-Key 以兼容代理导致的 Cookie 丢失（生产可恢复为仅会话）
   const baseHeaders: Record<string,string> = { 'Content-Type': 'application/json', ...(effKey ? { 'X-API-Key': effKey } : {}) }
   const headers = { ...baseHeaders, ...(init?.headers as Record<string,string> | undefined) }
   // Debug fetch
@@ -72,6 +76,7 @@ export async function postJson<T = unknown>(path: string, body: Json, init?: Req
 export async function getJson<T = unknown>(path: string, init?: RequestInit): Promise<T> {
   const effKey = getEffectiveApiKey()
   const url = buildUrl(path, effKey)
+  // 临时：始终携带 X-API-Key 以兼容代理导致的 Cookie 丢失（生产可恢复为仅会话）
   const baseHeaders: Record<string,string> = { ...(effKey ? { 'X-API-Key': effKey } : {}) }
   const headers = { ...baseHeaders, ...(init?.headers as Record<string,string> | undefined) }
   if (typeof window !== 'undefined') {
