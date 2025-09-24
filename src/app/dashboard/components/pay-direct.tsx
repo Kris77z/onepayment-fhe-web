@@ -69,17 +69,12 @@ async function getBalance(contractAddress: string, account: string, provider: et
 
 export function PayDirect() {
   const [amount, setAmount] = React.useState('20.00')
-  const [symbol, setSymbol] = React.useState<'USDT'|'USDC'>('USDT')
   const [loading, setLoading] = React.useState(false)
   const [contractAddr, setContractAddr] = React.useState<string>(TOKENS['USDT'])
   const [account, setAccount] = React.useState<string>('')
   const [orderId, setOrderId] = React.useState<string>(()=>`ORDER_${Date.now()}`)
   const [lastTx, setLastTx] = React.useState<string>('')
   const [lastStatus, setLastStatus] = React.useState<string>('')
-
-  React.useEffect(()=>{
-    setContractAddr(TOKENS[symbol])
-  }, [symbol])
 
   const start = async()=>{
     try{

@@ -112,7 +112,10 @@ export function SettingsPage() {
         // 会话态揭示（无 2FA），由后端做冷却与审计
         const res = await postJson<{ api_key: string; expires_at?: string }>(`/me/merchant/api-key/reveal`, {})
         if(res?.api_key){ setRevealedApiKey(res.api_key); setShowApiKey(true); return }
-      }catch(e){ console.error('reveal failed', (e as any)?.message) }
+      }catch(error){
+        const message = error instanceof Error ? error.message : String(error)
+        console.error('reveal failed', message)
+      }
     }
     setShowApiKey(next)
   }
