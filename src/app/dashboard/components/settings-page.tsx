@@ -320,7 +320,7 @@ export function SettingsPage() {
       }
       if(plain){ await copyToClipboard(plain, 'api'); toast.success('API Key copied') }
       else{ toast.error('Click the eye icon to reveal first') }
-    }catch(e:any){ toast.error(e?.message||'Copy failed') }
+    }catch(e: unknown){ const err = e as Error; toast.error(err?.message||'Copy failed') }
   }
 
   async function handleCopyWebhookSecret(){
@@ -329,7 +329,7 @@ export function SettingsPage() {
       if(!plain){ await revealWebhookSecret(); plain = revealedWebhookSecret }
       if(plain){ await copyToClipboard(plain, 'webhook'); toast.success('Webhook secret copied') }
       else{ toast.error('Click the eye icon to reveal first') }
-    }catch(e:any){ toast.error(e?.message||'Copy failed') }
+    }catch(e: unknown){ const err = e as Error; toast.error(err?.message||'Copy failed') }
   }
 
   async function testWebhook(){
