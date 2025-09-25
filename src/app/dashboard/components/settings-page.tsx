@@ -753,12 +753,12 @@ export function SettingsPage() {
                     <div className="space-y-2">
                       <div className="text-sm font-medium">cURL (Server)</div>
                       <pre className="rounded-lg border p-3 overflow-x-auto">{genResult.curl}</pre>
-                      <Button variant="outline" size="sm" onClick={()=>copyToClipboard(genResult!.curl!)}><IconCopy className="h-4 w-4 mr-2"/>Copy cURL</Button>
+                      <Button variant="outline" size="sm" onClick={()=>copyToClipboard(genResult!.curl!, 'api')}><IconCopy className="h-4 w-4 mr-2"/>Copy cURL</Button>
                     </div>
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Node.js (Server)</div>
                       <pre className="rounded-lg border p-3 overflow-x-auto">{genResult.node}</pre>
-                      <Button variant="outline" size="sm" onClick={()=>copyToClipboard(genResult!.node!)}><IconCopy className="h-4 w-4 mr-2"/>Copy Node</Button>
+                      <Button variant="outline" size="sm" onClick={()=>copyToClipboard(genResult!.node!, 'api')}><IconCopy className="h-4 w-4 mr-2"/>Copy Node</Button>
                     </div>
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Express (One route + Webhook)</div>
@@ -767,7 +767,7 @@ export function SettingsPage() {
                         <div className="text-muted-foreground">Install</div>
                         <pre className="rounded-lg border p-3 overflow-x-auto">{`npm install @onepay/merchant-sdk`}</pre>
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={()=>copyToClipboard('npm install @onepay/merchant-sdk')}><IconCopy className="h-4 w-4 mr-2"/>Copy</Button>
+                          <Button variant="outline" size="sm" onClick={()=>copyToClipboard('npm install @onepay/merchant-sdk', 'api')}><IconCopy className="h-4 w-4 mr-2"/>Copy</Button>
                         </div>
                       </div>
                       {/* Integration section */}
@@ -789,14 +789,14 @@ const h = createOnePayHandlers({
 app.post('/onepay/create-payment', h.createPayment)
 app.post('/onepay/webhook', h.webhook)
 `}</pre>
-                        <Button variant="outline" size="sm" onClick={()=>copyToClipboard(`import { createOnePayHandlers } from '@onepay/merchant-sdk'\n\nconst h = createOnePayHandlers({\n  baseUrl: process.env.ONEPAY_BASE_URL!,\n  apiKey: process.env.ONEPAY_API_KEY!,\n  webhookSecret: process.env.ONEPAY_WEBHOOK_SECRET!,\n  onEvent: async (evt) => { /* update order status */ }\n})\n\napp.post('/onepay/create-payment', h.createPayment)\napp.post('/onepay/webhook', h.webhook)`)}><IconCopy className="h-4 w-4 mr-2"/>Copy integration</Button>
+                        <Button variant="outline" size="sm" onClick={()=>copyToClipboard(`import { createOnePayHandlers } from '@onepay/merchant-sdk'\n\nconst h = createOnePayHandlers({\n  baseUrl: process.env.ONEPAY_BASE_URL!,\n  apiKey: process.env.ONEPAY_API_KEY!,\n  webhookSecret: process.env.ONEPAY_WEBHOOK_SECRET!,\n  onEvent: async (evt) => { /* update order status */ }\n})\n\napp.post('/onepay/create-payment', h.createPayment)\napp.post('/onepay/webhook', h.webhook)`, 'api')}><IconCopy className="h-4 w-4 mr-2"/>Copy integration</Button>
                       </div>
                     </div>
                     {genMode === 'static' && genResult?.html && (
                       <div className="space-y-2">
                         <div className="text-sm font-medium">HTML &lt;img&gt; (Client)</div>
                         <pre className="rounded-lg border p-3 overflow-x-auto">{genResult.html}</pre>
-                        <Button variant="outline" size="sm" onClick={()=>copyToClipboard(genResult!.html!)}><IconCopy className="h-4 w-4 mr-2"/>Copy HTML</Button>
+                        <Button variant="outline" size="sm" onClick={()=>copyToClipboard(genResult!.html!, 'api')}><IconCopy className="h-4 w-4 mr-2"/>Copy HTML</Button>
                       </div>
                     )}
                   </div>
