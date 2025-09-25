@@ -1,21 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import Image from "next/image";
-import { 
-  IconShield, 
-  IconBell, 
-  IconKey, 
-  IconCopy, 
-  IconEye, 
+import { useState, useEffect } from 'react'
+import { formatDistanceToNow } from 'date-fns'
+import { toast } from 'sonner'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import Image from 'next/image'
+import {
+  IconShield,
+  IconBell,
+  IconKey,
+  IconCopy,
+  IconEye,
   IconEyeOff,
   IconPlus,
   IconTrash,
@@ -25,10 +27,11 @@ import {
   IconExchange,
   IconAlertTriangle,
   IconBulb,
-  IconLock
-} from "@tabler/icons-react";
-import { postJson, getJson } from "@/lib/api";
-import { cn } from "@/lib/utils";
+  IconLock,
+  IconClock
+} from '@tabler/icons-react'
+import { postJson, getJson } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 // Types
 type MerchantPreferences = {
@@ -48,6 +51,7 @@ type MerchantInfo = {
   api_key_masked: string
   api_key?: string
   webhook_url: string
+  webhook_secret_preview?: string
   fee_bps: number
   status: string
   preferences?: MerchantPreferences
@@ -57,9 +61,19 @@ type FailedWebhookItem = { id: string; targetUrl: string; status: string; lastEr
 
 type ApiError = Error & { status?: number; data?: { error?: string } }
 
+const formatRevealCountdown = (expiresAt: string) => {
+  if (!expiresAt) return ''
+  try {
+    return formatDistanceToNow(new Date(expiresAt), { addSuffix: true })
+  } catch {
+    return ''
+  }
+}
+
 export function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false);
-  const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle')
+  const [apiCopyState, setApiCopyState] = useState<'idle' | 'copied'>('idle')
+  const [webhookCopyState, setWebhookCopyState] = useState<'idle' | 'copied'>('idle')
   const [notifications, setNotifications] = useState({
     email: true,
     push: false,
@@ -76,7 +90,11 @@ export function SettingsPage() {
   const [overrideApiKey, setOverrideApiKey] = useState<string>('')
   const [newApiKey, setNewApiKey] = useState<string>('')
   const [revealedApiKey, setRevealedApiKey] = useState<string>('')
-  const [webhookUrl, setWebhookUrl] = useState<string>('')
+  const [webhookUrl, setWebhookUrl] = useState<string>("");
+  const [webhookSecretPreview, setWebhookSecretPreview] = useState<string>('');
+  const [revealedWebhookSecret, setRevealedWebhookSecret] = useState<string>('');
+  const [webhookSecretExpiresAt, setWebhookSecretExpiresAt] = useState<string>('');
+  const [webhookSaving, setWebhookSaving] = useState(false);
   const [failedWebhooks, setFailedWebhooks] = useState<Array<FailedWebhookItem>>([])
   const [failedLoading, setFailedLoading] = useState(false)
   const [totpSetup, setTotpSetup] = useState<{ otpauth?: string; qrcode_data_url?: string; secret_base32?: string }|null>(null)
@@ -90,12 +108,17 @@ export function SettingsPage() {
     try{ await postJson(`/api/merchant/preferences`, { [key]: value }, { headers: apiHeaders() }) }catch{}
   };
 
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (text: string, type: 'api' | 'webhook') => {
     if (!text) return
     try {
       await navigator.clipboard.writeText(text)
-      setCopyState('copied')
-      setTimeout(() => setCopyState('idle'), 2000)
+      if (type === 'api') {
+        setApiCopyState('copied')
+        setTimeout(() => setApiCopyState('idle'), 2000)
+      } else {
+        setWebhookCopyState('copied')
+        setTimeout(() => setWebhookCopyState('idle'), 2000)
+      }
     } catch (error) {
       console.error('copy failed', error)
     }
@@ -119,8 +142,6 @@ export function SettingsPage() {
     }
     setShowApiKey(next)
   }
-
-
 
   // API Quickstart envs (dev convenience)
   const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '')
@@ -206,6 +227,9 @@ export function SettingsPage() {
       const data = await getJson<MerchantInfo>(overrideApiKey ? `/api/merchant/self` : `/me/merchant`, { headers: apiHeaders() })
       setMerchant(data)
       setWebhookUrl(data?.webhook_url || '')
+      setWebhookSecretPreview(data?.webhook_secret_preview || '')
+      setRevealedWebhookSecret('')
+      setWebhookSecretExpiresAt('')
       if(data?.preferences){ setNotifications((prev)=>({ ...prev, ...data.preferences })) }
     }catch{
       // ignore
@@ -243,11 +267,69 @@ export function SettingsPage() {
     }catch{}
   }
 
-  async function saveWebhook(){
+  async function saveWebhook(options?: { regenerate?: boolean }){
     try{
-      await postJson(overrideApiKey ? `/api/merchant/webhook` : `/me/merchant/webhook`, { webhook_url: webhookUrl }, { headers: apiHeaders() })
-      await loadMerchant()
+      setWebhookSaving(true)
+      const payload: Record<string, unknown> = { webhook_url: webhookUrl }
+      if(options?.regenerate){ payload.regenerate_secret = true }
+      const res = await postJson<{ webhook_url: string; webhook_secret_preview?: string; webhook_secret?: string; expires_at?: string }>(
+        overrideApiKey ? `/api/merchant/webhook-config` : `/me/merchant/webhook-config`,
+        payload,
+        { headers: apiHeaders() }
+      )
+      setWebhookUrl(res?.webhook_url || '')
+      setWebhookSecretPreview(res?.webhook_secret_preview || '')
+      if(res?.webhook_secret){
+        setRevealedWebhookSecret(res.webhook_secret)
+        setWebhookSecretExpiresAt(res.expires_at || '')
+      }else{
+        setRevealedWebhookSecret('')
+        setWebhookSecretExpiresAt('')
+      }
+      try{ (await import('sonner')).toast?.success?.('Webhook settings saved') }catch{}
     }catch{}
+    finally{ setWebhookSaving(false) }
+  }
+
+  async function revealWebhookSecret(){
+    try{
+      const res = await postJson<{ webhook_secret: string; expires_at?: string }>(overrideApiKey ? `/api/merchant/webhook-secret/reveal` : `/me/merchant/webhook-secret/reveal`, {}, { headers: apiHeaders() })
+      setRevealedWebhookSecret(res?.webhook_secret || '')
+      setWebhookSecretExpiresAt(res?.expires_at || '')
+    }catch(error){
+      const err = error as ApiError
+      const code = err?.data?.error || err.message
+      if(String(code).toUpperCase()==='UNAUTHORIZED'){
+        toast.error('Unauthorized. Please login to reveal the secret.')
+      }else if(String(code).toUpperCase()==='RATE_LIMITED'){
+        toast.error('Please wait before revealing again.')
+      }else{
+        toast.error(code || 'Reveal failed')
+      }
+    }
+  }
+
+  // Copy helpers to always copy plaintext
+  async function handleCopyApiKey(){
+    try{
+      let plain = revealedApiKey || newApiKey || overrideApiKey || merchant?.api_key
+      if(!plain){
+        const res = await postJson<{ api_key: string; expires_at?: string }>(`/me/merchant/api-key/reveal`, {})
+        plain = res?.api_key
+        if(plain){ setRevealedApiKey(plain); setShowApiKey(true) }
+      }
+      if(plain){ await copyToClipboard(plain, 'api'); toast.success('API Key copied') }
+      else{ toast.error('Click the eye icon to reveal first') }
+    }catch(e:any){ toast.error(e?.message||'Copy failed') }
+  }
+
+  async function handleCopyWebhookSecret(){
+    try{
+      let plain = revealedWebhookSecret
+      if(!plain){ await revealWebhookSecret(); plain = revealedWebhookSecret }
+      if(plain){ await copyToClipboard(plain, 'webhook'); toast.success('Webhook secret copied') }
+      else{ toast.error('Click the eye icon to reveal first') }
+    }catch(e:any){ toast.error(e?.message||'Copy failed') }
   }
 
   async function testWebhook(){
@@ -475,21 +557,32 @@ export function SettingsPage() {
                       {showApiKey ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
                     </Button>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex items-center justify-between gap-2">
                     <Input
                       value={showApiKey ? (merchant?.api_key || revealedApiKey || newApiKey || overrideApiKey || merchant?.api_key_masked || '••••••') : (merchant?.api_key_masked || '••••••')}
                       readOnly
                       className="font-mono"
                     />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(merchant?.api_key || revealedApiKey || newApiKey || overrideApiKey || merchant?.api_key_masked || '')}
-                      className={cn(copyState === 'copied' && 'border-emerald-400 text-emerald-500')}
-                    >
-                      <IconCopy className="h-4 w-4 mr-2" />
-                      {copyState === 'copied' ? 'Copied' : 'Copy'}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={handleToggleApiVisibility}
+                        aria-label={showApiKey ? 'Hide API Key' : 'Show API Key'}
+                      >
+                        {showApiKey ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyApiKey}
+                        className={cn(apiCopyState === 'copied' && 'border-emerald-400 text-emerald-500')}
+                      >
+                        <IconCopy className="h-4 w-4 mr-2" />
+                        {apiCopyState === 'copied' ? 'Copied' : 'Copy'}
+                      </Button>
+                    </div>
                   </div>
                   {!showApiKey && (
                     <p className="text-xs text-muted-foreground">Masked by default for security. Click the eye icon to reveal.</p>
@@ -500,8 +593,78 @@ export function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Webhook removed per product decision */}
+          <Card>
+            <CardContent className="space-y-4 pt-6">
+              <div className="space-y-1">
+                <h3 className="text-lg font-medium">Webhook Settings</h3>
+                <p className="text-sm text-muted-foreground">Configure the callback URL and shared secret used for OnePay payment notifications.</p>
+              </div>
 
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="webhook-url">Webhook URL</Label>
+                  <Input
+                    id="webhook-url"
+                    placeholder="https://your-domain.com/api/onepay/webhook"
+                    value={webhookUrl}
+                    onChange={(e)=>setWebhookUrl(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="webhook-secret">Webhook Secret</Label>
+                  <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Input
+                      id="webhook-secret"
+                      readOnly
+                      placeholder="••••••"
+                      value={revealedWebhookSecret || webhookSecretPreview || '••••••'}
+                      className="font-mono"
+                    />
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={revealWebhookSecret}
+                        aria-label="Reveal Webhook Secret"
+                      >
+                        <IconEye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyWebhookSecret}
+                        disabled={!revealedWebhookSecret && !webhookSecretPreview}
+                        className={cn(webhookCopyState==='copied' && 'border-emerald-400 text-emerald-500')}
+                      >
+                        <IconCopy className="h-4 w-4 mr-2" />
+                        {webhookCopyState === 'copied' ? 'Copied' : 'Copy'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                {webhookSecretExpiresAt ? (
+                  <p className="text-xs text-muted-foreground">
+                    Secret visible for <span className="font-medium">{formatRevealCountdown(webhookSecretExpiresAt) || 'a short time'}</span>. Please store it securely.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Click “Reveal secret” to view the full value for 2 minutes. Use it in your server as <code>ONEPAY_WEBHOOK_SECRET</code>.</p>
+                )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div />
+                <div className="flex gap-2">
+                  <Button onClick={()=>saveWebhook()} disabled={webhookSaving}>
+                    {webhookSaving ? 'Saving...' : 'Save'}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
           <Card>
             <CardContent className="space-y-6 pt-6">
               {/* 示例不再默认展示，改为下方生成后显示 */}
@@ -596,6 +759,38 @@ export function SettingsPage() {
                       <div className="text-sm font-medium">Node.js (Server)</div>
                       <pre className="rounded-lg border p-3 overflow-x-auto">{genResult.node}</pre>
                       <Button variant="outline" size="sm" onClick={()=>copyToClipboard(genResult!.node!)}><IconCopy className="h-4 w-4 mr-2"/>Copy Node</Button>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Express (One route + Webhook)</div>
+                      {/* Install section */}
+                      <div className="space-y-1">
+                        <div className="text-muted-foreground">Install</div>
+                        <pre className="rounded-lg border p-3 overflow-x-auto">{`npm install @onepay/merchant-sdk`}</pre>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={()=>copyToClipboard('npm install @onepay/merchant-sdk')}><IconCopy className="h-4 w-4 mr-2"/>Copy</Button>
+                        </div>
+                      </div>
+                      {/* Integration section */}
+                      <div className="space-y-1">
+                        <div className="text-muted-foreground">Integration (mount to your existing server)</div>
+                        <pre className="rounded-lg border p-3 overflow-x-auto">{`
+import { createOnePayHandlers } from '@onepay/merchant-sdk'
+
+// in your server entry where 'app' is already created
+const h = createOnePayHandlers({
+  baseUrl: process.env.ONEPAY_BASE_URL!,
+  apiKey: process.env.ONEPAY_API_KEY!,
+  webhookSecret: process.env.ONEPAY_WEBHOOK_SECRET!,
+  onEvent: async (evt) => {
+    // TODO: update order status in DB
+  }
+})
+
+app.post('/onepay/create-payment', h.createPayment)
+app.post('/onepay/webhook', h.webhook)
+`}</pre>
+                        <Button variant="outline" size="sm" onClick={()=>copyToClipboard(`import { createOnePayHandlers } from '@onepay/merchant-sdk'\n\nconst h = createOnePayHandlers({\n  baseUrl: process.env.ONEPAY_BASE_URL!,\n  apiKey: process.env.ONEPAY_API_KEY!,\n  webhookSecret: process.env.ONEPAY_WEBHOOK_SECRET!,\n  onEvent: async (evt) => { /* update order status */ }\n})\n\napp.post('/onepay/create-payment', h.createPayment)\napp.post('/onepay/webhook', h.webhook)`)}><IconCopy className="h-4 w-4 mr-2"/>Copy integration</Button>
+                      </div>
                     </div>
                     {genMode === 'static' && genResult?.html && (
                       <div className="space-y-2">
