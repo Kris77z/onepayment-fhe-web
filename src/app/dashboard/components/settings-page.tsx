@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
+// removed Badge (no longer used after inline mode help)
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Image from 'next/image'
 import {
@@ -30,7 +30,7 @@ import {
   IconLock,
   IconClock
 } from '@tabler/icons-react'
-import { postJson, getJson } from '@/lib/api'
+import { postJson, getJson, API_BASE } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 // Types
@@ -132,12 +132,24 @@ export function SettingsPage() {
           setShowApiKey(true)
           return
         }
+        if(!API_BASE){
+          try{ (await import('sonner')).toast?.error?.('后端未配置：请设置 NEXT_PUBLIC_API_BASE') }catch{}
+          return
+        }
         // 会话态揭示（无 2FA），由后端做冷却与审计
         const res = await postJson<{ api_key: string; expires_at?: string }>(`/me/merchant/api-key/reveal`, {})
         if(res?.api_key){ setRevealedApiKey(res.api_key); setShowApiKey(true); return }
       }catch(error){
-        const message = error instanceof Error ? error.message : String(error)
-        console.error('reveal failed', message)
+        const anyErr = error as any
+        const status = Number(anyErr?.status)
+        const code = String(anyErr?.data?.error || anyErr?.message || 'RequestFailed')
+        if(status === 401 || status === 403 || code.toUpperCase() === 'UNAUTHORIZED'){
+          try{ (await import('sonner')).toast?.error?.('登录已过期，请重新登录') }catch{}
+          try{ setTimeout(()=>{ window.location.href = `/auth?redirect=${encodeURIComponent(location.pathname)}` }, 1200) }catch{}
+        }else{
+          try{ (await import('sonner')).toast?.error?.(code) }catch{}
+        }
+        console.error('reveal failed', code)
       }
     }
     setShowApiKey(next)
@@ -547,15 +559,6 @@ export function SettingsPage() {
                 <div className="space-y-2 md:col-span-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">API Key</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={handleToggleApiVisibility}
-                      aria-label={showApiKey ? 'Hide API Key' : 'Show API Key'}
-                    >
-                      {showApiKey ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
-                    </Button>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <Input
@@ -573,12 +576,8 @@ export function SettingsPage() {
                       >
                         {showApiKey ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCopyApiKey}
-                        className={cn(apiCopyState === 'copied' && 'border-emerald-400 text-emerald-500')}
-                      >
+                      {/* Copy button moved inside code blocks for snippets; keep API key copy here for convenience */}
+                      <Button variant="outline" size="sm" onClick={handleCopyApiKey} className={cn(apiCopyState === 'copied' && 'border-emerald-400 text-emerald-500')}>
                         <IconCopy className="h-4 w-4 mr-2" />
                         {apiCopyState === 'copied' ? 'Copied' : 'Copy'}
                       </Button>
@@ -674,16 +673,21 @@ export function SettingsPage() {
                 <h3 className="text-lg font-medium">API Snippet Generator</h3>
                 <div className="space-y-4">
                   <div className="space-y-3">
-                    <div className="text-sm font-medium">Mode</div>
-                    <Select value={genMode} onValueChange={(v)=>setGenMode(v as 'invoice'|'static')}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="invoice">Per-order (invoice)</SelectItem>
-                        <SelectItem value="static">Static Button (long-lived)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-56">
+                        <div className="text-sm font-medium">Mode</div>
+                        <Select value={genMode} onValueChange={(v)=>setGenMode(v as 'invoice'|'static')}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="invoice">Per-order (invoice)</SelectItem>
+                            <SelectItem value="static">Static Button (long-lived)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {/* mode help moved below each snippet title */}
+                    </div>
                   </div>
                   <div className="space-y-3">
                     <div className="text-sm font-medium">Chain</div>
@@ -752,28 +756,69 @@ export function SettingsPage() {
                   <div className="space-y-5 text-xs">
                     <div className="space-y-2">
                       <div className="text-sm font-medium">cURL (Server)</div>
-                      <pre className="rounded-lg border p-3 overflow-x-auto">{genResult.curl}</pre>
-                      <Button variant="outline" size="sm" onClick={()=>copyToClipboard(genResult!.curl!, 'api')}><IconCopy className="h-4 w-4 mr-2"/>Copy cURL</Button>
+                      <p className="text-xs text-muted-foreground">
+                        Minimal endpoints: <code>/onepay/create-payment</code> + <code>/onepay/webhook</code> (Express), or
+                        <code> /api/onepay/orders</code> + <code>/api/onepay/webhook</code> (Next). Recommended: add
+                        <code> /api/onepay/attempt</code>, <code> /api/onepay/status</code>, <code> /api/onepay/notify</code>.
+                      </p>
+                      <div className="relative group">
+                        <pre className="rounded-lg border p-3 overflow-x-auto">{genResult.curl}</pre>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={()=>copyToClipboard(genResult!.curl!, 'api')}
+                          aria-label="Copy cURL"
+                        >
+                          <IconCopy className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Node.js (Server)</div>
-                      <pre className="rounded-lg border p-3 overflow-x-auto">{genResult.node}</pre>
-                      <Button variant="outline" size="sm" onClick={()=>copyToClipboard(genResult!.node!, 'api')}><IconCopy className="h-4 w-4 mr-2"/>Copy Node</Button>
+                      <p className="text-xs text-muted-foreground">
+                        Same endpoints as cURL above. Keep API Key and Webhook Secret on server-side only.
+                      </p>
+                      <div className="relative group">
+                        <pre className="rounded-lg border p-3 overflow-x-auto">{genResult.node}</pre>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={()=>copyToClipboard(genResult!.node!, 'api')}
+                          aria-label="Copy Node"
+                        >
+                          <IconCopy className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Express (One route + Webhook)</div>
+                      <p className="text-xs text-muted-foreground">
+                        Minimal setup: mount <code>/onepay/create-payment</code> and <code>/onepay/webhook</code>.
+                        You can later add attempt/status/notify for better UX and idempotency.
+                      </p>
                       {/* Install section */}
                       <div className="space-y-1">
                         <div className="text-muted-foreground">Install</div>
-                        <pre className="rounded-lg border p-3 overflow-x-auto">{`npm install @onepay/merchant-sdk`}</pre>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={()=>copyToClipboard('npm install @onepay/merchant-sdk', 'api')}><IconCopy className="h-4 w-4 mr-2"/>Copy</Button>
+                        <div className="relative group">
+                          <pre className="rounded-lg border p-3 overflow-x-auto">{`npm install @onepay/merchant-sdk`}</pre>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={()=>copyToClipboard('npm install @onepay/merchant-sdk', 'api')}
+                            aria-label="Copy"
+                          >
+                            <IconCopy className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                       {/* Integration section */}
                       <div className="space-y-1">
                         <div className="text-muted-foreground">Integration (mount to your existing server)</div>
-                        <pre className="rounded-lg border p-3 overflow-x-auto">{`
+                        <div className="relative group">
+                          <pre className="rounded-lg border p-3 overflow-x-auto">{`
 import { createOnePayHandlers } from '@onepay/merchant-sdk'
 
 // in your server entry where 'app' is already created
@@ -789,14 +834,36 @@ const h = createOnePayHandlers({
 app.post('/onepay/create-payment', h.createPayment)
 app.post('/onepay/webhook', h.webhook)
 `}</pre>
-                        <Button variant="outline" size="sm" onClick={()=>copyToClipboard(`import { createOnePayHandlers } from '@onepay/merchant-sdk'\n\nconst h = createOnePayHandlers({\n  baseUrl: process.env.ONEPAY_BASE_URL!,\n  apiKey: process.env.ONEPAY_API_KEY!,\n  webhookSecret: process.env.ONEPAY_WEBHOOK_SECRET!,\n  onEvent: async (evt) => { /* update order status */ }\n})\n\napp.post('/onepay/create-payment', h.createPayment)\napp.post('/onepay/webhook', h.webhook)`, 'api')}><IconCopy className="h-4 w-4 mr-2"/>Copy integration</Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={()=>copyToClipboard(`import { createOnePayHandlers } from '@onepay/merchant-sdk'\n\nconst h = createOnePayHandlers({\n  baseUrl: process.env.ONEPAY_BASE_URL!,\n  apiKey: process.env.ONEPAY_API_KEY!,\n  webhookSecret: process.env.ONEPAY_WEBHOOK_SECRET!,\n  onEvent: async (evt) => { /* update order status */ }\n})\n\napp.post('/onepay/create-payment', h.createPayment)\napp.post('/onepay/webhook', h.webhook)`, 'api')}
+                            aria-label="Copy integration"
+                          >
+                            <IconCopy className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                     {genMode === 'static' && genResult?.html && (
                       <div className="space-y-2">
                         <div className="text-sm font-medium">HTML &lt;img&gt; (Client)</div>
-                        <pre className="rounded-lg border p-3 overflow-x-auto">{genResult.html}</pre>
-                        <Button variant="outline" size="sm" onClick={()=>copyToClipboard(genResult!.html!, 'api')}><IconCopy className="h-4 w-4 mr-2"/>Copy HTML</Button>
+                        <p className="text-xs text-muted-foreground">
+                          Static QR mode: only <code>/api/onepay/webhook</code> is required; consider offline matching on backend.
+                        </p>
+                        <div className="relative group">
+                          <pre className="rounded-lg border p-3 overflow-x-auto">{genResult.html}</pre>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={()=>copyToClipboard(genResult!.html!, 'api')}
+                            aria-label="Copy HTML"
+                          >
+                            <IconCopy className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
