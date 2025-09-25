@@ -140,9 +140,9 @@ export function SettingsPage() {
         const res = await postJson<{ api_key: string; expires_at?: string }>(`/me/merchant/api-key/reveal`, {})
         if(res?.api_key){ setRevealedApiKey(res.api_key); setShowApiKey(true); return }
       }catch(error){
-        const anyErr = error as any
-        const status = Number(anyErr?.status)
-        const code = String(anyErr?.data?.error || anyErr?.message || 'RequestFailed')
+        const err = error as ApiError
+        const status = typeof err?.status === 'number' ? err.status : undefined
+        const code = String(err?.data?.error || err?.message || 'RequestFailed')
         if(status === 401 || status === 403 || code.toUpperCase() === 'UNAUTHORIZED'){
           try{ (await import('sonner')).toast?.error?.('登录已过期，请重新登录') }catch{}
           try{ setTimeout(()=>{ window.location.href = `/auth?redirect=${encodeURIComponent(location.pathname)}` }, 1200) }catch{}

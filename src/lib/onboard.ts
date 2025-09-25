@@ -1,11 +1,19 @@
-import Onboard, { type OnboardAPI, type WalletState } from '@web3-onboard/core'
-import injectedModule from '@web3-onboard/injected-wallets'
-import walletConnectModule from '@web3-onboard/walletconnect'
+// 动态导入，避免在服务端打包期解析依赖链（pino-pretty）
+import type { OnboardAPI, WalletState } from '@web3-onboard/core'
 
 let onboardSingleton: OnboardAPI | null = null
 
-export function getOnboard(): OnboardAPI {
+export async function getOnboard(): Promise<OnboardAPI> {
   if (onboardSingleton) return onboardSingleton
+  if (typeof window === 'undefined') {
+    throw new Error('getOnboard must be called in browser')
+  }
+
+  const [{ default: Onboard }, { default: injectedModule }, { default: walletConnectModule }] = await Promise.all([
+    import('@web3-onboard/core'),
+    import('@web3-onboard/injected-wallets'),
+    import('@web3-onboard/walletconnect')
+  ])
 
   const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID || 'b95b3a526564c9e0e5700eb061374ffb'
 
@@ -51,7 +59,7 @@ export function getOnboard(): OnboardAPI {
 }
 
 export async function connectWithOnboard(): Promise<WalletState[] | undefined> {
-  const onboard = getOnboard()
+  const onboard = await getOnboard()
   const wallets = await onboard.connectWallet()
   return wallets
 }
