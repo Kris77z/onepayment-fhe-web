@@ -3,6 +3,7 @@ import Footer from "@/components/sections/footer";
 import PaymentHero from "@/components/sections/payment-hero";
 import PaymentMethods from "@/components/sections/payment-methods";
 import PaymentFeatures from "@/components/sections/payment-features";
+import PaymentFlowVisualization from "@/components/sections/payment-flow-visualization";
 import HowToAccept from "@/components/sections/how-to-accept";
 import SupportedAssets from "@/components/sections/supported-assets";
 import ContactSection from "@/components/sections/contact-section";
@@ -14,6 +15,9 @@ export default function PaymentsPage() {
       <main className="flex-1">
         {/* Hero Section */}
         <PaymentHero />
+        
+        {/* Payment Flow Visualization */}
+        <PaymentFlowVisualization />
         
         {/* Payment Methods */}
         <PaymentMethods />
