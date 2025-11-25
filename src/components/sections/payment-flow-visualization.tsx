@@ -75,9 +75,6 @@ export default function PaymentFlowVisualization() {
 
           {/* Flow Steps */}
           <div className="relative">
-            {/* Connection Lines - Desktop */}
-            <div className="hidden lg:block absolute top-12 left-0 right-0 h-0.5 bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20" />
-            
             {/* Steps */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 relative z-10">
               {flowSteps.map((step, index) => {
