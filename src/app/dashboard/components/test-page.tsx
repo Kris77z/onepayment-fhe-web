@@ -43,7 +43,7 @@ const getSolanaProvider = (): SolanaProvider | null => {
 declare global {
   interface Window {
     okxwallet?: EthereumProvider
-    ethereum?: EthereumProvider
+    ethereum?: any
   }
 }
 
@@ -297,7 +297,7 @@ export default function TestPage() {
     try {
       const injected = window.okxwallet || window.ethereum
       if (injected) {
-        const currentChainIdHex = await injected.request<string>({ method: 'eth_chainId' })
+        const currentChainIdHex = await injected.request({ method: 'eth_chainId' }) as string
         const currentChainId = parseInt(currentChainIdHex, 16)
         const chainKey = findChainKeyById(currentChainId)
         if (chainKey) {
@@ -410,7 +410,7 @@ export default function TestPage() {
         }
         const injected = window.okxwallet || window.ethereum
         if (!injected) { toast.error('未检测到浏览器钱包'); return }
-        const accounts = await injected.request<string[]>({ method: 'eth_requestAccounts' })
+        const accounts = await injected.request({ method: 'eth_requestAccounts' }) as string[]
         if (accounts?.[0]) {
           setAccount(accounts[0])
           updateMetrics({ walletConnected: true })
@@ -656,7 +656,7 @@ export default function TestPage() {
       }
       const tokenAddress = normalizeAddress(await getTokenAddress())
       const injected = window.okxwallet || window.ethereum
-      const chainIdHex = injected ? await injected.request<string>({ method: 'eth_chainId' }) : '0x61'
+      const chainIdHex = injected ? await injected.request({ method: 'eth_chainId' }) as string : '0x61'
       const chainIdDec = parseInt(String(chainIdHex), 16) || 97
       const decimals = resolveDecimals()
       if (!amount || Number(amount) <= 0) {
@@ -752,7 +752,7 @@ export default function TestPage() {
         }
       }
       // 再次读取当前链ID进行校验
-      const currentChainId = (await injected.request<string>({ method: 'eth_chainId' }))?.toLowerCase()
+      const currentChainId = (await injected.request({ method: 'eth_chainId' }) as string)?.toLowerCase()
       if (currentChainId === chainConfig.chainId.toLowerCase()) {
         setCustomContract('') // 切链后清空自定义合约，避免误用
         setSelectedChain(chainKey as 'ethereum'|'bsc'|'arbitrum')
@@ -761,7 +761,7 @@ export default function TestPage() {
         addLog(`✅ 成功切换到 ${chainConfig.displayName} (chainId=${currentChainId})`, 'success')
         // 切链后同步 EVM 账户并刷新余额
         try {
-          const accounts = await injected.request<string[]>({ method: 'eth_requestAccounts' })
+          const accounts = await injected.request({ method: 'eth_requestAccounts' }) as string[]
           const evmAddr = accounts?.[0]
           if(evmAddr){ setAccount(evmAddr); await checkTokenBalance(evmAddr, chainKey as 'ethereum'|'bsc'|'arbitrum') }
         } catch {}
@@ -1497,7 +1497,7 @@ export default function TestPage() {
             {loading ? '测试中...' : '开始完整闭环测试'}
           </Button>
           <div className="flex items-center justify-end">
-            <Select value={selectedChain} onValueChange={(value) => switchToChain(value as keyof typeof CHAIN_CONFIGS)}>
+            <Select value={selectedChain} onValueChange={(value: string) => switchToChain(value as keyof typeof CHAIN_CONFIGS)}>
               <SelectTrigger className="w-52">
                 <div className="flex items-center gap-2">
                   <img 

@@ -30,6 +30,24 @@ import {
   IconLock,
   IconClock
 } from '@tabler/icons-react'
+
+// Type workaround for React version conflicts
+const IconShieldComp = IconShield as any;
+const IconBellComp = IconBell as any;
+const IconKeyComp = IconKey as any;
+const IconCopyComp = IconCopy as any;
+const IconEyeComp = IconEye as any;
+const IconEyeOffComp = IconEyeOff as any;
+const IconPlusComp = IconPlus as any;
+const IconTrashComp = IconTrash as any;
+const IconRefreshComp = IconRefresh as any;
+const IconMailComp = IconMail as any;
+const IconBrowserCheckComp = IconBrowserCheck as any;
+const IconExchangeComp = IconExchange as any;
+const IconAlertTriangleComp = IconAlertTriangle as any;
+const IconBulbComp = IconBulb as any;
+const IconLockComp = IconLock as any;
+const IconClockComp = IconClock as any;
 import { postJson, getJson, API_BASE } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
@@ -394,11 +412,11 @@ export function SettingsPage() {
       <Tabs defaultValue="api" className="w-full space-y-4">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="api">
-            <IconKey className="mr-2 h-4 w-4" />
+            <IconKeyComp className="mr-2 h-4 w-4" />
             API
           </TabsTrigger>
           <TabsTrigger value="notifications">
-            <IconBell className="mr-2 h-4 w-4" />
+            <IconBellComp className="mr-2 h-4 w-4" />
             General
           </TabsTrigger>
         </TabsList>
@@ -414,7 +432,7 @@ export function SettingsPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <IconMail className="h-4 w-4 text-muted-foreground" />
+                      <IconMailComp className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="font-medium">Email</p>
                         <p className="text-sm text-muted-foreground">Receive important updates via email</p>
@@ -422,12 +440,12 @@ export function SettingsPage() {
                     </div>
                     <Switch 
                       checked={notifications.email}
-                      onCheckedChange={(checked) => handleNotificationChange('email', checked)}
+                      onCheckedChange={(checked: boolean) => handleNotificationChange('email', checked)}
                     />
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <IconBrowserCheck className="h-4 w-4 text-muted-foreground" />
+                      <IconBrowserCheckComp className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="font-medium">Browser push</p>
                         <p className="text-sm text-muted-foreground">Receive push notifications in your browser</p>
@@ -435,7 +453,7 @@ export function SettingsPage() {
                     </div>
                     <Switch 
                       checked={notifications.push}
-                      onCheckedChange={(checked) => handleNotificationChange('push', checked)}
+                      onCheckedChange={(checked: boolean) => handleNotificationChange('push', checked)}
                     />
                   </div>
                 </div>
@@ -447,7 +465,7 @@ export function SettingsPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <IconExchange className="h-4 w-4 text-muted-foreground" />
+                      <IconExchangeComp className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="font-medium">Transaction updates</p>
                         <p className="text-sm text-muted-foreground">Completed, failed, and status updates</p>
@@ -455,12 +473,12 @@ export function SettingsPage() {
                     </div>
                     <Switch 
                       checked={notifications.trading}
-                      onCheckedChange={(checked) => handleNotificationChange('trading', checked)}
+                      onCheckedChange={(checked: boolean) => handleNotificationChange('trading', checked)}
                     />
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <IconAlertTriangle className="h-4 w-4 text-muted-foreground" />
+                      <IconAlertTriangleComp className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="font-medium">Security alerts</p>
                         <p className="text-sm text-muted-foreground">Login activity and security notices</p>
@@ -468,12 +486,12 @@ export function SettingsPage() {
                     </div>
                     <Switch 
                       checked={notifications.security}
-                      onCheckedChange={(checked) => handleNotificationChange('security', checked)}
+                      onCheckedChange={(checked: boolean) => handleNotificationChange('security', checked)}
                     />
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <IconBulb className="h-4 w-4 text-muted-foreground" />
+                      <IconBulbComp className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="font-medium">Product updates</p>
                         <p className="text-sm text-muted-foreground">New features and announcements</p>
@@ -481,7 +499,7 @@ export function SettingsPage() {
                     </div>
                     <Switch 
                       checked={notifications.news}
-                      onCheckedChange={(checked) => handleNotificationChange('news', checked)}
+                      onCheckedChange={(checked: boolean) => handleNotificationChange('news', checked)}
                     />
                   </div>
                 </div>
@@ -493,7 +511,7 @@ export function SettingsPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <IconLock className="h-4 w-4 text-muted-foreground" />
+                      <IconLockComp className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="font-medium">Authenticator app</p>
                         <p className="text-sm text-muted-foreground">Use Google Authenticator or other apps</p>
@@ -501,7 +519,7 @@ export function SettingsPage() {
                     </div>
                     <Switch 
                       checked={Boolean(merchant?.preferences?.totp_enabled)}
-                      onCheckedChange={(checked) => {
+                      onCheckedChange={(checked: boolean) => {
                         if (checked && !merchant?.preferences?.totp_enabled) {
                           setup2FA()
                         } else if (!checked && merchant?.preferences?.totp_enabled) {
@@ -574,11 +592,11 @@ export function SettingsPage() {
                         onClick={handleToggleApiVisibility}
                         aria-label={showApiKey ? 'Hide API Key' : 'Show API Key'}
                       >
-                        {showApiKey ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
+                         {showApiKey ? <IconEyeOffComp className="h-4 w-4" /> : <IconEyeComp className="h-4 w-4" />}
                       </Button>
                       {/* Copy button moved inside code blocks for snippets; keep API key copy here for convenience */}
                       <Button variant="outline" size="sm" onClick={handleCopyApiKey} className={cn(apiCopyState === 'copied' && 'border-emerald-400 text-emerald-500')}>
-                        <IconCopy className="h-4 w-4 mr-2" />
+                        <IconCopyComp className="h-4 w-4 mr-2" />
                         {apiCopyState === 'copied' ? 'Copied' : 'Copy'}
                       </Button>
                     </div>
@@ -628,7 +646,7 @@ export function SettingsPage() {
                         onClick={revealWebhookSecret}
                         aria-label="Reveal Webhook Secret"
                       >
-                        <IconEye className="h-4 w-4" />
+                         <IconEyeComp className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="outline"
@@ -637,7 +655,7 @@ export function SettingsPage() {
                         disabled={!revealedWebhookSecret && !webhookSecretPreview}
                         className={cn(webhookCopyState==='copied' && 'border-emerald-400 text-emerald-500')}
                       >
-                        <IconCopy className="h-4 w-4 mr-2" />
+                        <IconCopyComp className="h-4 w-4 mr-2" />
                         {webhookCopyState === 'copied' ? 'Copied' : 'Copy'}
                       </Button>
                     </div>
@@ -676,7 +694,7 @@ export function SettingsPage() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-56">
                         <div className="text-sm font-medium">Mode</div>
-                        <Select value={genMode} onValueChange={(v)=>setGenMode(v as 'invoice'|'static')}>
+                        <Select value={genMode} onValueChange={(v: string)=>setGenMode(v as 'invoice'|'static')}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -714,7 +732,7 @@ export function SettingsPage() {
                   </div>
                   <div className="space-y-3">
                     <div className="text-sm font-medium">Token</div>
-                    <Select value={genToken} onValueChange={(v) => setGenToken(v as 'USDT'|'USDC')}>
+                    <Select value={genToken} onValueChange={(v: string) => setGenToken(v as 'USDT'|'USDC')}>
                       <SelectTrigger>
                         <SelectValue>
                           <div className="flex items-center gap-2">
@@ -770,7 +788,7 @@ export function SettingsPage() {
                           onClick={()=>copyToClipboard(genResult!.curl!, 'api')}
                           aria-label="Copy cURL"
                         >
-                          <IconCopy className="h-4 w-4" />
+                          <IconCopyComp className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
@@ -788,7 +806,7 @@ export function SettingsPage() {
                           onClick={()=>copyToClipboard(genResult!.node!, 'api')}
                           aria-label="Copy Node"
                         >
-                          <IconCopy className="h-4 w-4" />
+                          <IconCopyComp className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
@@ -810,7 +828,7 @@ export function SettingsPage() {
                             onClick={()=>copyToClipboard('npm install @onepay/merchant-sdk', 'api')}
                             aria-label="Copy"
                           >
-                            <IconCopy className="h-4 w-4" />
+                            <IconCopyComp className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
@@ -841,7 +859,7 @@ app.post('/onepay/webhook', h.webhook)
                             onClick={()=>copyToClipboard(`import { createOnePayHandlers } from '@onepay/merchant-sdk'\n\nconst h = createOnePayHandlers({\n  baseUrl: process.env.ONEPAY_BASE_URL!,\n  apiKey: process.env.ONEPAY_API_KEY!,\n  webhookSecret: process.env.ONEPAY_WEBHOOK_SECRET!,\n  onEvent: async (evt) => { /* update order status */ }\n})\n\napp.post('/onepay/create-payment', h.createPayment)\napp.post('/onepay/webhook', h.webhook)`, 'api')}
                             aria-label="Copy integration"
                           >
-                            <IconCopy className="h-4 w-4" />
+                            <IconCopyComp className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
@@ -861,7 +879,7 @@ app.post('/onepay/webhook', h.webhook)
                             onClick={()=>copyToClipboard(genResult!.html!, 'api')}
                             aria-label="Copy HTML"
                           >
-                            <IconCopy className="h-4 w-4" />
+                            <IconCopyComp className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>

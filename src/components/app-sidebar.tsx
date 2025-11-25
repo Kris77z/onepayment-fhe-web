@@ -6,6 +6,7 @@ import {
   IconExchange,
   IconHistory,
   IconSettings,
+  IconWallet,
 } from "@tabler/icons-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -25,7 +26,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-type PageType = 'overview' | 'trade' | 'history' | 'settings';
+type PageType = 'overview' | 'payment' | 'trade' | 'history' | 'settings';
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onPageChange?: (page: PageType) => void;
@@ -48,28 +49,35 @@ export function AppSidebar({ onPageChange, currentPage, ...props }: AppSidebarPr
     {
       title: "Overview",
       url: "/dashboard/overview",
-      icon: IconChartPie,
+      icon: IconChartPie as any,
       key: "overview" as PageType,
       isActive: pathname?.startsWith("/dashboard/overview"),
     },
     {
+      title: "Payment",
+      url: "/dashboard/payment",
+      icon: IconWallet as any,
+      key: "payment" as PageType,
+      isActive: pathname?.startsWith("/dashboard/payment"),
+    },
+    {
       title: "Trade",
       url: "/dashboard/trade",
-      icon: IconExchange,
+      icon: IconExchange as any,
       key: "trade" as PageType,
       isActive: pathname?.startsWith("/dashboard/trade"),
     },
     {
       title: "History",
       url: "/dashboard/history",
-      icon: IconHistory,
+      icon: IconHistory as any,
       key: "history" as PageType,
       isActive: pathname?.startsWith("/dashboard/history"),
     },
     {
       title: "Settings",
       url: "/dashboard/settings",
-      icon: IconSettings,
+      icon: IconSettings as any,
       key: "settings" as PageType,
       isActive: pathname?.startsWith("/dashboard/settings"),
     },

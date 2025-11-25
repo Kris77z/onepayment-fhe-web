@@ -13,6 +13,9 @@ import {
   type UniqueIdentifier,
 } from "@dnd-kit/core"
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers"
+
+// Type workaround for React version conflicts
+const DndContextComp = DndContext as any;
 import {
   arrayMove,
   SortableContext,
@@ -52,6 +55,12 @@ import {
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import { toast } from "sonner"
 import { z } from "zod"
+
+// Type workaround for React version conflicts
+const AreaChartComp2 = AreaChart as any;
+const AreaComp2 = Area as any;
+const CartesianGridComp2 = CartesianGrid as any;
+const XAxisComp2 = XAxis as any;
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Badge } from "@/components/ui/badge"
@@ -130,7 +139,7 @@ function DragHandle({ id }: { id: number }) {
       size="icon"
       className="text-muted-foreground size-7 hover:bg-transparent"
     >
-      <IconGripVertical className="text-muted-foreground size-3" />
+      {React.createElement(IconGripVertical as any, { className: "text-muted-foreground size-3" }) as any}
       <span className="sr-only">Drag to reorder</span>
     </Button>
   )
@@ -151,7 +160,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
             table.getIsAllPageRowsSelected() ||
             (table.getIsSomePageRowsSelected() && "indeterminate")
           }
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          onCheckedChange={(value: any) => table.toggleAllPageRowsSelected(!!value)}
           aria-label="Select all"
         />
       </div>
@@ -160,7 +169,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
       <div className="flex items-center justify-center">
         <Checkbox
           checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          onCheckedChange={(value: any) => row.toggleSelected(!!value)}
           aria-label="Select row"
         />
       </div>
@@ -193,9 +202,9 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     cell: ({ row }) => (
       <Badge variant="outline" className="text-muted-foreground px-1.5">
         {row.original.status === "Done" ? (
-          <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
+          React.createElement(IconCircleCheckFilled as any, { className: "fill-green-500 dark:fill-green-400" }) as any
         ) : (
-          <IconLoader />
+          React.createElement(IconLoader as any) as any
         )}
         {row.original.status}
       </Badge>
@@ -294,7 +303,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
             className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
             size="icon"
           >
-            <IconDotsVertical />
+            {React.createElement(IconDotsVertical as any) as any}
             <span className="sr-only">Open menu</span>
           </Button>
         </DropdownMenuTrigger>
@@ -328,7 +337,7 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
     >
       {row.getVisibleCells().map((cell) => (
         <TableCell key={cell.id}>
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          {flexRender(cell.column.columnDef.cell, cell.getContext()) as any}
         </TableCell>
       ))}
     </TableRow>
@@ -437,10 +446,10 @@ export function DataTable({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
-                <IconLayoutColumns />
+                {React.createElement(IconLayoutColumns as any) as any}
                 <span className="hidden lg:inline">Customize Columns</span>
                 <span className="lg:hidden">Columns</span>
-                <IconChevronDown />
+                {React.createElement(IconChevronDown as any) as any}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
@@ -457,7 +466,7 @@ export function DataTable({
                       key={column.id}
                       className="capitalize"
                       checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
+                      onCheckedChange={(value: any) =>
                         column.toggleVisibility(!!value)
                       }
                     >
@@ -468,7 +477,7 @@ export function DataTable({
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="outline" size="sm">
-            <IconPlus />
+            {React.createElement(IconPlus as any) as any}
             <span className="hidden lg:inline">Add Section</span>
           </Button>
         </div>
@@ -478,7 +487,7 @@ export function DataTable({
         className="relative flex flex-col gap-4 overflow-auto"
       >
         <div className="overflow-hidden rounded-lg border">
-          <DndContext
+          <DndContextComp
             collisionDetection={closestCenter}
             modifiers={[restrictToVerticalAxis]}
             onDragEnd={handleDragEnd}
@@ -497,7 +506,7 @@ export function DataTable({
                             : flexRender(
                                 header.column.columnDef.header,
                                 header.getContext()
-                              )}
+                              ) as any}
                         </TableHead>
                       )
                     })}
@@ -526,7 +535,7 @@ export function DataTable({
                 )}
               </TableBody>
             </Table>
-          </DndContext>
+          </DndContextComp>
         </div>
         <div className="flex items-center justify-between">
           <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
@@ -540,7 +549,7 @@ export function DataTable({
               </Label>
               <Select
                 value={`${table.getState().pagination.pageSize}`}
-                onValueChange={(value) => {
+                onValueChange={(value: any) => {
                   table.setPageSize(Number(value))
                 }}
               >
@@ -570,7 +579,7 @@ export function DataTable({
                 disabled={!table.getCanPreviousPage()}
               >
                 <span className="sr-only">Go to first page</span>
-                <IconChevronsLeft />
+                {React.createElement(IconChevronsLeft as any) as any}
               </Button>
               <Button
                 variant="outline"
@@ -580,7 +589,7 @@ export function DataTable({
                 disabled={!table.getCanPreviousPage()}
               >
                 <span className="sr-only">Go to previous page</span>
-                <IconChevronLeft />
+                {React.createElement(IconChevronLeft as any) as any}
               </Button>
               <Button
                 variant="outline"
@@ -590,7 +599,7 @@ export function DataTable({
                 disabled={!table.getCanNextPage()}
               >
                 <span className="sr-only">Go to next page</span>
-                <IconChevronRight />
+                {React.createElement(IconChevronRight as any) as any}
               </Button>
               <Button
                 variant="outline"
@@ -600,7 +609,7 @@ export function DataTable({
                 disabled={!table.getCanNextPage()}
               >
                 <span className="sr-only">Go to last page</span>
-                <IconChevronsRight />
+                {React.createElement(IconChevronsRight as any) as any}
               </Button>
             </div>
           </div>
@@ -666,7 +675,7 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
           {!isMobile && (
             <>
               <ChartContainer config={chartConfig}>
-                <AreaChart
+                <AreaChartComp2
                   accessibilityLayer
                   data={chartData}
                   margin={{
@@ -674,20 +683,20 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
                     right: 10,
                   }}
                 >
-                  <CartesianGrid vertical={false} />
-                  <XAxis
+                  <CartesianGridComp2 vertical={false} />
+                  <XAxisComp2
                     dataKey="month"
                     tickLine={false}
                     axisLine={false}
                     tickMargin={8}
-                    tickFormatter={(value) => value.slice(0, 3)}
+                    tickFormatter={(value: any) => value.slice(0, 3)}
                     hide
                   />
                   <ChartTooltip
                     cursor={false}
                     content={<ChartTooltipContent indicator="dot" />}
                   />
-                  <Area
+                  <AreaComp2
                     dataKey="mobile"
                     type="natural"
                     fill="var(--color-mobile)"
@@ -695,7 +704,7 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
                     stroke="var(--color-mobile)"
                     stackId="a"
                   />
-                  <Area
+                  <AreaComp2
                     dataKey="desktop"
                     type="natural"
                     fill="var(--color-desktop)"
@@ -703,13 +712,13 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
                     stroke="var(--color-desktop)"
                     stackId="a"
                   />
-                </AreaChart>
+                </AreaChartComp2>
               </ChartContainer>
               <Separator />
               <div className="grid gap-2">
                 <div className="flex gap-2 leading-none font-medium">
                   Trending up by 5.2% this month{" "}
-                  <IconTrendingUp className="size-4" />
+                  {React.createElement(IconTrendingUp as any, { className: "size-4" }) as any}
                 </div>
                 <div className="text-muted-foreground">
                   Showing total visitors for the last 6 months. This is just

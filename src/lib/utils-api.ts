@@ -1,8 +1,8 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+export function cn(...inputs: ClassValue[]): string {
+  return twMerge(clsx(inputs));
 }
 
 export const formatCurrency = (value: number, options?: Intl.NumberFormatOptions) =>
@@ -13,3 +13,4 @@ export const formatCurrency = (value: number, options?: Intl.NumberFormatOptions
     maximumFractionDigits: 6,
     ...options
   }).format(value);
+

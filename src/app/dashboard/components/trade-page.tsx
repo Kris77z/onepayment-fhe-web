@@ -8,6 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { IconExchange, IconWallet, IconSend } from "@tabler/icons-react";
+
+// Type workaround for React version conflicts
+const IconExchangeComp = IconExchange as any;
+const IconWalletComp = IconWallet as any;
+const IconSendComp = IconSend as any;
 import Image from "next/image";
 import { getJson } from "@/lib/api";
 import { useEffect } from "react";
@@ -48,11 +53,11 @@ export function TradePage() {
       <Tabs defaultValue="send" className="w-full space-y-4">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="send">
-            <IconSend className="mr-2 h-4 w-4" />
+            <IconSendComp className="mr-2 h-4 w-4" />
             Send
           </TabsTrigger>
           <TabsTrigger value="swap">
-            <IconExchange className="mr-2 h-4 w-4" />
+            <IconExchangeComp className="mr-2 h-4 w-4" />
             Swap
           </TabsTrigger>
         </TabsList>
@@ -63,7 +68,7 @@ export function TradePage() {
             <CardContent className="space-y-6 pt-6">
               <div className="flex items-center justify-center py-20">
                 <div className="text-center">
-                  <IconExchange className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                  <IconExchangeComp className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium text-muted-foreground">Swap is coming soon. Direct Send is available below.</h3>
                   <p className="text-sm text-muted-foreground mt-2">Token swap feature is under development</p>
                 </div>
@@ -79,7 +84,7 @@ export function TradePage() {
               {/* Select Token */}
               <div className="space-y-2">
                 <div className="text-sm font-medium">Select Token</div>
-                <Select value={sendToken} onValueChange={(v)=>setSendToken(v as 'USDT'|'USDC')}>
+                <Select value={sendToken} onValueChange={(v: string)=>setSendToken(v as 'USDT'|'USDC')}>
                   <SelectTrigger>
                     <SelectValue>
                       <div className="flex items-center gap-2">
@@ -104,7 +109,7 @@ export function TradePage() {
               {/* Select Chain */}
               <div className="space-y-2">
                 <div className="text-sm font-medium">Select Chain</div>
-                <Select value={chain} onValueChange={(v)=>setChain(v)}>
+                <Select value={chain} onValueChange={(v: string)=>setChain(v)}>
                   <SelectTrigger>
                     <SelectValue>
                       <div className="flex items-center gap-2">

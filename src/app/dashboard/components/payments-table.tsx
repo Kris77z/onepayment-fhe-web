@@ -11,6 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { IconChevronLeft, IconChevronRight, IconExternalLink, IconDownload } from "@tabler/icons-react"
 
+// Type workaround for React version conflicts
+const IconChevronLeftComp = IconChevronLeft as any;
+const IconChevronRightComp = IconChevronRight as any;
+const IconExternalLinkComp = IconExternalLink as any;
+const IconDownloadComp = IconDownload as any;
+import { formatCurrency } from "@/lib/utils"
+
 type PaymentRow = {
   id: string
   orderId: string
@@ -33,15 +40,13 @@ type ListResp = {
   pageSize: number
 }
 
-// 改为会话端点，无需 MERCHANT_ID
-
 function explorerBase(chain: string): string | null {
   const c = chain.toLowerCase()
-  // 仅主网
   if(c === 'bsc') return 'https://bscscan.com/tx/'
   if(c === 'ethereum') return 'https://etherscan.io/tx/'
   if(c === 'arbitrum') return 'https://arbiscan.io/tx/'
   if(c === 'polygon') return 'https://polygonscan.com/tx/'
+  if(c === 'base' || c === 'base-sepolia') return 'https://sepolia.basescan.org/tx/'
   return null
 }
 
@@ -55,6 +60,7 @@ export default function PaymentsTable(){
   const [resp, setResp] = React.useState<ListResp>({ items: [], total: 0, page: 1, pageSize })
   const [exporting, setExporting] = React.useState(false)
 
+  // Fetch payment data from backend API
   const fetchList = React.useCallback(async ()=>{
     try{
       setLoading(true)
@@ -64,16 +70,21 @@ export default function PaymentsTable(){
       qs.set('pageSize', String(pageSize))
       if(status && status !== 'all') qs.set('status', status)
       if(search.trim()) qs.set('search', search.trim())
-      // 默认近30天
       qs.set('range', '30d')
       qs.set('includeFees', 'true')
       const data = await getJson<ListResp>(`/me/payments?${qs.toString()}`)
       setResp(data)
-    }catch(e){ setError(e instanceof Error ? e.message : String(e)) }
+    }catch(e){ 
+      console.error('Failed to fetch payments:', e)
+      setError(e instanceof Error ? e.message : String(e))
+    }
     finally{ setLoading(false) }
   }, [page, pageSize, status, search])
 
-  React.useEffect(() => { fetchList() }, [fetchList])
+  React.useEffect(() => { 
+    fetchList() 
+  }, [fetchList])
+
   const toCsv = (rows: PaymentRow[]) => {
     const header = ['time','chain','token','amount','sender','status','txHash']
     const lines = [header.join(',')]
@@ -97,16 +108,8 @@ export default function PaymentsTable(){
   async function handleExport(){
     try{
       setExporting(true)
-      // 简化：导出当前筛选条件下的前 1000 条
-      const qs = new URLSearchParams()
-      qs.set('page', '1')
-      qs.set('pageSize', '1000')
-      if(status && status !== 'all') qs.set('status', status)
-      if(search.trim()) qs.set('search', search.trim())
-      qs.set('range', '30d')
-      qs.set('includeFees', 'true')
-      const data = await getJson<ListResp>(`/me/payments?${qs.toString()}`)
-      const csv = toCsv(data?.items||[])
+      const rows = resp?.items || []
+      const csv = toCsv(rows)
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -118,6 +121,7 @@ export default function PaymentsTable(){
     finally{ setExporting(false) }
   }
 
+  const displayRows = resp?.items || []
   const totalPages = Math.max(1, Math.ceil((resp?.total||0) / (resp?.pageSize||pageSize)))
 
   return (
@@ -131,7 +135,7 @@ export default function PaymentsTable(){
             <Label htmlFor="search" className="sr-only">Search</Label>
             <Input id="search" placeholder="Search txHash / sender" value={search} onChange={(e)=>setSearch(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter'){ setPage(1); fetchList() }}} />
           </div>
-          <Select value={status} onValueChange={(v)=>{ setStatus(v); setPage(1) }}>
+          <Select value={status} onValueChange={(v: string)=>{ setStatus(v); setPage(1) }}>
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
@@ -142,7 +146,7 @@ export default function PaymentsTable(){
               <SelectItem value="failed">Failed</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={String(pageSize)} onValueChange={(v)=>{ setPageSize(Number(v)); setPage(1) }}>
+          <Select value={String(pageSize)} onValueChange={(v: string)=>{ setPageSize(Number(v)); setPage(1) }}>
             <SelectTrigger className="w-28">
               <SelectValue />
             </SelectTrigger>
@@ -154,7 +158,7 @@ export default function PaymentsTable(){
           </Select>
           <Button variant="outline" onClick={()=>{ setPage(1); fetchList() }}>Refresh</Button>
           <Button onClick={handleExport} disabled={exporting}>
-            <IconDownload className="h-4 w-4 mr-2" />{exporting ? 'Exporting...' : 'Export CSV'}
+            <IconDownloadComp className="h-4 w-4 mr-2" />{exporting ? 'Exporting...' : 'Export CSV'}
           </Button>
         </div>
 
@@ -172,7 +176,20 @@ export default function PaymentsTable(){
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(resp?.items||[]).map((it)=>{
+              {displayRows
+                .filter(row => {
+                  if (status && status !== 'all' && row.status !== status) return false
+                  if (search.trim()) {
+                    const searchLower = search.toLowerCase()
+                    return (
+                      row.txHash?.toLowerCase().includes(searchLower) ||
+                      row.sender?.toLowerCase().includes(searchLower)
+                    )
+                  }
+                  return true
+                })
+                .slice((page - 1) * pageSize, page * pageSize)
+                .map((it)=>{
                 const tokenSymbol = it.order?.tokenSymbol || ''
                 const linkBase = it.status === 'fee' ? null : explorerBase(it.chain)
                 return (
@@ -188,16 +205,19 @@ export default function PaymentsTable(){
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="sm" disabled={!linkBase} onClick={()=>{
-                        if(linkBase){ window.open(`${linkBase}${it.txHash}`, '_blank') } else if(it.txHash){ window.open(it.txHash, '_blank') }
+                      <Button variant="ghost" size="sm" disabled={!linkBase || !it.txHash} onClick={()=>{
+                        if(linkBase && it.txHash){ 
+                          const url = `${linkBase}${it.txHash}`
+                          window.open(url, '_blank') 
+                        } else if(it.txHash){ window.open(it.txHash, '_blank') }
                       }}>
-                        <IconExternalLink className="h-4 w-4" />
+                        <IconExternalLinkComp className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
                 )
               })}
-              {(!resp?.items || resp.items.length===0) && (
+              {displayRows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">No Data</TableCell>
                 </TableRow>
@@ -210,11 +230,11 @@ export default function PaymentsTable(){
           <div className="text-xs text-muted-foreground">Total {resp?.total||0} items</div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" disabled={page<=1 || loading} onClick={()=> setPage(p=> Math.max(1, p-1))}>
-              <IconChevronLeft className="h-4 w-4" />
+              <IconChevronLeftComp className="h-4 w-4" />
             </Button>
             <div className="text-sm">{page} / {totalPages}</div>
             <Button variant="outline" size="icon" disabled={page>=totalPages || loading} onClick={()=> setPage(p=> Math.min(totalPages, p+1))}>
-              <IconChevronRight className="h-4 w-4" />
+              <IconChevronRightComp className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -225,5 +245,3 @@ export default function PaymentsTable(){
     </Card>
   )
 }
-
-
